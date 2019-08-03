@@ -2,11 +2,8 @@ package license
 
 import (
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rsa"
-	"crypto/sha1"
-	"crypto/x509"
+	"crypto/rand"
+
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
@@ -14,12 +11,8 @@ import (
 )
 
 var (
-	oidSignatureSHA256WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
-	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
-	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
-	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
-	oidLicenseMinVersion        = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 1}
-	oidLicenseMaxVersion        = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
+	oidLicenseMinVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 1}
+	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
 )
 
 type License struct {
@@ -59,8 +52,8 @@ type asnFeature struct {
 }
 
 type asnSignature struct {
-	Algorithm pkix.AlgorithmIdentifier
-	Value     asn1.BitString
+	pkix.AlgorithmIdentifier
+	Value asn1.BitString
 }
 
 type asnLicense struct {
@@ -68,109 +61,31 @@ type asnLicense struct {
 	Signature asnSignature
 }
 
-// TODO snValidate Handler
-func ParseLicense(asn1Data []byte) (*License, error) {
-	var lic asnLicense
-	if rest, err := asn1.Unmarshal(asn1Data, &lic); err != nil {
-		return nil, err
-	} else if len(rest) != 0 {
-		return nil, errors.New("license: trailing data")
-	}
-
-	// TODO Validate signature
-
-	license := &License{
-		ProductName:  lic.License.ProductName,
-		SerialNumber: lic.License.SerialNumber,
-		Customer:     lic.License.Customer,
-		ValidFrom:    lic.License.Validity.From,
-		ValidUntil:   lic.License.Validity.Until,
-		signature:    lic.Signature,
-	}
-
-	for _, feature := range lic.License.Features {
-		switch {
-		case feature.Oid.Equal(oidLicenseMinVersion):
-			license.MinVersion = feature.Limit
-
-		case feature.Oid.Equal(oidLicenseMaxVersion):
-			license.MaxVersion = feature.Limit
-
-		default:
-
-		}
-	}
-
-	return license, nil
-}
-
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
-
-	var signatureAlgorithm pkix.AlgorithmIdentifier
-	var hashFunc crypto.Hash
-
 	publicKey := key.Public()
-
-	switch pub := publicKey.(type) {
-	case *rsa.PublicKey:
-		hashFunc = crypto.SHA256
-		signatureAlgorithm.Algorithm = oidSignatureSHA256WithRSA
-		signatureAlgorithm.Parameters = asn1.NullRawValue
-
-	case *ecdsa.PublicKey:
-		switch pub.Curve {
-		case elliptic.P224(), elliptic.P256():
-			hashFunc = crypto.SHA256
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA256
-		case elliptic.P384():
-			hashFunc = crypto.SHA384
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA384
-		case elliptic.P521():
-			hashFunc = crypto.SHA512
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA512
-		default:
-			return nil, errors.New("license: unknown elliptic curve")
-		}
-
-	default:
-		return nil, errors.New("license: only RSA and ECDSA keys supported")
-	}
-
-	sigBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	authorityKeyId, err := publicKeySignature(publicKey)
 	if err != nil {
 		return nil, err
 	}
-
-	authorityHash := sha1.New()
-	_, err = authorityHash.Write(sigBytes)
+	hashFunc, signatureAlgorithm, err := hashFromPublicKey(publicKey)
 	if err != nil {
 		return nil, err
 	}
-
-	authorityKeyId, err := asn1.Marshal(authorityHash.Sum(nil))
-	if err != nil {
-		return nil, err
-	}
-
 	var features []asnFeature
 
 	if template.MinVersion > 0 {
 		features = append(features, asnFeature{Oid: oidLicenseMinVersion, Limit: template.MinVersion})
 	}
-
 	if template.MaxVersion > 0 {
 		features = append(features, asnFeature{Oid: oidLicenseMaxVersion, Limit: template.MaxVersion})
 	}
-
 	for _, feature := range template.Features {
-		//
 		features = append(features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
-
 	tbsLicense := asnSignedLicense{
 		ProductName:        template.ProductName,
 		SerialNumber:       template.SerialNumber,
@@ -181,45 +96,63 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		SignatureAlgorithm: signatureAlgorithm,
 	}
 
-	licObject, err := signLicense(tbsLicense, hashFunc)
+	digest, err := asnObjectSignature(tbsLicense, hashFunc.New())
 	if err != nil {
 		return nil, err
 	}
+	var signature []byte
+	signature, err = key.Sign(rand.Reader, digest, hashFunc)
+	if err != nil {
+		return nil, err
+	}
+	licObject := &asnLicense{
+		License: tbsLicense,
+		Signature: asnSignature{
+			AlgorithmIdentifier: tbsLicense.SignatureAlgorithm,
+			Value:               asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
+		},
+	}
 
 	return asn1.Marshal(*licObject)
-
 }
 
 // TODO snValidate Handler
-func (l *License) Load(asn1Data []byte) error {
-	var lic asnLicense
-	if rest, err := asn1.Unmarshal(asn1Data, &lic); err != nil {
+func (l *License) Load(asn1Data []byte, pubKey interface{}) error {
+	var licObject asnLicense
+	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {
 		return err
 	} else if len(rest) != 0 {
 		return errors.New("license: trailing data")
 	}
 
-	// TODO Validate signature
-
-	l.ProductName = lic.License.ProductName
-
-	l.SerialNumber = lic.License.SerialNumber
-
-	if lic.License.Validity.IsValid(time.Now()) {
-		l.ValidFrom = lic.License.Validity.From
-		l.ValidUntil = lic.License.Validity.Until
+	hashFunc, err := hashFuncFromAlgorithm(licObject.Signature.Algorithm)
+	if err != nil {
+		return err
 	}
+	digest, err := asnObjectSignature(licObject.License, hashFunc.New())
+	if err != nil {
+		return err
+	}
+	// TODO Validate signature
+	if len(digest) == 0 {
 
-	l.Customer = lic.License.Customer
+	}
+	license := licObject.License
+	l.ProductName = license.ProductName
+	l.SerialNumber = license.SerialNumber
 
-	for _, feature := range lic.License.Features {
+	if license.Validity.IsValid(time.Now()) {
+		l.ValidFrom = license.Validity.From
+		l.ValidUntil = license.Validity.Until
+	}
+	l.Customer = license.Customer
+
+	for _, feature := range license.Features {
 		switch {
 		case feature.Oid.Equal(oidLicenseMinVersion):
 			l.MinVersion = feature.Limit
-
 		case feature.Oid.Equal(oidLicenseMaxVersion):
 			l.MaxVersion = feature.Limit
-
 		default:
 			description, found := l.knownFeatures[feature.Oid.String()]
 			if !found {
@@ -229,31 +162,7 @@ func (l *License) Load(asn1Data []byte) error {
 		}
 	}
 
-	l.signature = lic.Signature
+	l.signature = licObject.Signature
 
 	return nil
-}
-
-func signLicense(lic asnSignedLicense, hash crypto.Hash) (*asnLicense, error) {
-
-	sLicContent, err := asn1.Marshal(lic)
-	if err != nil {
-		return nil, err
-	}
-
-	h := hash.New()
-	_, err = h.Write(sLicContent)
-	if err != nil {
-		return nil, err
-	}
-
-	signature := h.Sum(nil)
-
-	return &asnLicense{
-		License: lic,
-		Signature: asnSignature{
-			Algorithm: lic.SignatureAlgorithm,
-			Value:     asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
-		},
-	}, nil
 }
