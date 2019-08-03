@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	E_FeatureAllreadyExists = errors.New("license: Feature allready exists")
+	ErrNoSuchFeature         = errors.New("license: No such feature")
+	ErrFeatureAllreadyExists = errors.New("license: Feature allready exists")
 )
 
 func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error {
@@ -15,16 +16,11 @@ func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error 
 	}
 	_, found := l.knownFeatures[oid.String()]
 	if found {
-		return E_FeatureAllreadyExists
+		return ErrFeatureAllreadyExists
 	}
 	l.knownFeatures[oid.String()] = name
 
 	return nil
-}
-
-func (l *License) IsRegistered(oid asn1.ObjectIdentifier) bool {
-	_, found := l.knownFeatures[oid.String()]
-	return found
 }
 
 func (l *License) GetFeature(oid asn1.ObjectIdentifier) (string, int64, error) {
@@ -33,15 +29,5 @@ func (l *License) GetFeature(oid asn1.ObjectIdentifier) (string, int64, error) {
 			return l.knownFeatures[oid.String()], feature.Limit, nil
 		}
 	}
-	return "", 0, nil
-}
-
-// Check if license have certain feature
-func (l *License) HasFeature(oid asn1.ObjectIdentifier) bool {
-	for _, feature := range l.Features {
-		if feature.Oid.Equal(oid) {
-			return true
-		}
-	}
-	return false
+	return "", 0, ErrNoSuchFeature
 }

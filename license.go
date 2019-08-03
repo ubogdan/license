@@ -16,16 +16,17 @@ var (
 )
 
 type License struct {
-	ProductName   string            `json:"product"`
-	SerialNumber  string            `json:"serial"`
-	Customer      Customer          `json:"customer"`
-	ValidFrom     time.Time         `json:"valid_from,omitempty" asn1:"default:0"`
-	ValidUntil    time.Time         `json:"valid_until,omitempty" asn1:"default:0"`
-	MinVersion    int64             `json:"min_version,omitempty" asn1:"default:0"`
-	MaxVersion    int64             `json:"max_version,omitempty" asn1:"default:0"`
-	Features      []Feature         `json:"features"`
-	knownFeatures map[string]string `json:"features"`
-	signature     asnSignature
+	ProductName           string    `json:"product"`
+	SerialNumber          string    `json:"serial"`
+	Customer              Customer  `json:"customer"`
+	ValidFrom             time.Time `json:"valid_from,omitempty" asn1:"default:0"`
+	ValidUntil            time.Time `json:"valid_until,omitempty" asn1:"default:0"`
+	MinVersion            int64     `json:"min_version,omitempty" asn1:"default:0"`
+	MaxVersion            int64     `json:"max_version,omitempty" asn1:"default:0"`
+	Features              []Feature `json:"features"`
+	knownFeatures         map[string]string
+	SerialNumberValidator func(serial string) error
+	signature             asnSignature
 }
 
 type Feature struct {
@@ -116,7 +117,6 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	return asn1.Marshal(*licObject)
 }
 
-// TODO snValidate Handler
 func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	var licObject asnLicense
 	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {
@@ -151,6 +151,12 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	}
 
 	l.ProductName = license.ProductName
+	if l.SerialNumberValidator != nil {
+		err := l.SerialNumberValidator(license.SerialNumber)
+		if err != nil {
+			return err
+		}
+	}
 	l.SerialNumber = license.SerialNumber
 
 	if license.Validity.IsValid(time.Now()) {
@@ -159,6 +165,8 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	}
 	l.Customer = license.Customer
 
+	// Clear old features
+	l.Features = []Feature{}
 	for _, feature := range license.Features {
 		switch {
 		case feature.Oid.Equal(oidLicenseMinVersion):

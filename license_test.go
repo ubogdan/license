@@ -7,6 +7,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
@@ -197,6 +198,27 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 
 }
 
+func TestLoadLicenseWithWrongAuthority(t *testing.T) {
+	testLicense1, err := base64.StdEncoding.DecodeString(testLicense1pem)
+	assert.NoError(t, err)
+
+	testLicense2, err := base64.StdEncoding.DecodeString(testLicense1pem)
+	assert.NoError(t, err)
+
+	license := &License{}
+
+	// Random Authority
+	privateEcc, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Parse
+	err = license.Load(testLicense1, privateEcc.Public())
+	assert.Error(t, err)
+
+	// Parse
+	err = license.Load(testLicense2, privateEcc.Public())
+	assert.Error(t, err)
+}
+
 func TestLoadLicenseWithVersion(t *testing.T) {
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
@@ -240,5 +262,121 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 	assert.Equalf(t, testLicenseCustomerOrganization, license.Customer.Organization, "Invalid customer Organization")
 
 	assert.Equalf(t, testLicenseCustomerOrganizationalUnit, license.Customer.OrganizationalUnit, "Invalid customer OrganizationalUnit")
+
+}
+
+func TestLoadLicenseWithSerial(t *testing.T) {
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	genLicense := &License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+		ValidFrom:    time.Unix(testLicenseValidFrom, 0),
+		ValidUntil:   time.Unix(testLicenseValidUntil, 0),
+		Customer: Customer{
+			Name: testLicenseCustomerName,
+		},
+	}
+	// Valid SN
+	testLicense1, err := CreateLicense(genLicense, privateEcc)
+
+	genLicense.SerialNumber = "Invalid Serial Number"
+	testLicense2, err := CreateLicense(genLicense, privateEcc)
+
+	license := &License{
+		SerialNumberValidator: func(sn string) error {
+			if sn == testLicenseSerial {
+				return nil
+			}
+			return errors.New("Invalid Serial")
+		},
+	}
+
+	// TestValid SN
+	err = license.Load(testLicense1, privateEcc.Public())
+	assert.NoError(t, err)
+
+	// TestInvalid SN
+	err = license.Load(testLicense2, privateEcc.Public())
+	assert.Error(t, err)
+}
+
+func TestLoadLicenseCorrupt(t *testing.T) {
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	genLicense := &License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+	}
+	testLicense, err := CreateLicense(genLicense, privateEcc)
+
+	// Corrupted data
+	corrupteLicense := append(testLicense[3:], testLicense[:3]...)
+
+	prependLicense := append(testLicense, testLicense[:10]...)
+
+	license := &License{}
+
+	err = license.Load(corrupteLicense, privateEcc.Public())
+	assert.Error(t, err)
+
+	err = license.Load(prependLicense, privateEcc.Public())
+	assert.Error(t, err)
+
+}
+
+func TestLoadLicenseInvalidKey(t *testing.T) {
+
+	dsaKey := &mock.CryptoSigner{
+		PublicKey: &dsa.PublicKey{},
+	}
+
+	testLicense2, err := base64.StdEncoding.DecodeString(testLicense1pem)
+	assert.NoError(t, err)
+
+	license := &License{}
+
+	// Parse
+	err = license.Load(testLicense2, dsaKey)
+	assert.Error(t, err)
+
+}
+
+func TestLoadLicenseInvalidAlorithm(t *testing.T) {
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	licObject := asnLicense{
+		License: asnSignedLicense{
+			SignatureAlgorithm: pkix.AlgorithmIdentifier{
+				Algorithm: oidLicenseMinVersion,
+			},
+		},
+		Signature: asnSignature{
+			AlgorithmIdentifier: pkix.AlgorithmIdentifier{
+				Algorithm: oidLicenseMinVersion,
+			},
+		},
+	}
+
+	testLicense, err := asn1.Marshal(licObject)
+	assert.NoError(t, err)
+
+	license := &License{}
+
+	// Parse
+	err = license.Load(testLicense, privateEcc)
+	assert.Error(t, err)
 
 }

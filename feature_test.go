@@ -49,3 +49,43 @@ func TestAddFeature(t *testing.T) {
 		}
 	}
 }
+
+func TestGetFeature(t *testing.T) {
+	feature1oid := asn1.ObjectIdentifier{1, 3, 1, 1}
+
+	tests := []struct {
+		Feature    Feature
+		ShouldFail bool
+	}{
+		{
+			Feature: Feature{
+				Oid: feature1oid,
+			},
+			ShouldFail: false,
+		},
+		{
+			Feature: Feature{
+				Oid: asn1.ObjectIdentifier{1, 3, 2, 1},
+			},
+			ShouldFail: true,
+		},
+	}
+
+	l := &License{
+		Features: []Feature{
+			{
+				Oid: feature1oid,
+			},
+		},
+	}
+	l.RegisterFeature("Feature1", feature1oid)
+
+	for _, test := range tests {
+		_, _, err := l.GetFeature(test.Feature.Oid)
+		if test.ShouldFail {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}

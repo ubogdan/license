@@ -10,7 +10,9 @@ import (
 	"crypto/sha1"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"errors"
 	"hash"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,6 +115,14 @@ func Test_publicKeySignature(t *testing.T) {
 	assert.Error(t, err)
 }
 
+type mocHash struct{}
+
+func (m mocHash) Write(p []byte) (n int, err error) { return 0, errors.New("Error") }
+func (m mocHash) Reset()                            { return }
+func (m mocHash) Size() int                         { return 0 }
+func (m mocHash) BlockSize() int                    { return 0 }
+func (m mocHash) Sum(b []byte) []byte               { return nil }
+
 func Test_asnObjectSignature(t *testing.T) {
 	tests := []struct {
 		Data       interface{}
@@ -128,10 +138,18 @@ func Test_asnObjectSignature(t *testing.T) {
 			Hash:       sha1.New(),
 			ShouldFail: false,
 		},
-
 		{
 			Data:       asnSignedLicense{},
 			Hash:       sha1.New(),
+			ShouldFail: true,
+		},
+		{
+			Data: asnSignedLicense{
+				SignatureAlgorithm: pkix.AlgorithmIdentifier{
+					Algorithm: oidSignatureECDSAWithSHA256,
+				},
+			},
+			Hash:       mocHash{},
 			ShouldFail: true,
 		},
 	}
@@ -144,4 +162,93 @@ func Test_asnObjectSignature(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
+}
+
+func Test_checkSignature(t *testing.T) {
+	var err error
+
+	hashType := crypto.SHA1
+
+	h := hashType.New()
+	h.Write([]byte("Test Message"))
+	digest := h.Sum(nil)
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	assert.NoError(t, err)
+
+	eccKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	rsaSignature, err := rsaKey.Sign(rand.Reader, digest, hashType)
+	assert.NoError(t, err)
+
+	eccSignature, err := eccKey.Sign(rand.Reader, digest, hashType)
+	assert.NoError(t, err)
+
+	err = checkSignature(digest, rsaSignature, crypto.SHA3_512, rsaKey.Public())
+	assert.Error(t, err)
+
+	type ecdsaSignature struct {
+		R, S *big.Int
+	}
+
+	invalidecdsaSignature, err := asn1.Marshal(ecdsaSignature{R: big.NewInt(0), S: big.NewInt(-1)})
+	assert.NoError(t, err)
+
+	invalidecdsaSignatureValues, err := asn1.Marshal(ecdsaSignature{R: big.NewInt(123123123123123), S: big.NewInt(543241234123)})
+	assert.NoError(t, err)
+
+	tests := []struct {
+		Key        crypto.Signer
+		Signature  []byte
+		ShouldFail bool
+	}{
+		{
+			Key:        rsaKey,
+			Signature:  rsaSignature,
+			ShouldFail: false,
+		},
+		{
+			Key:        eccKey,
+			Signature:  eccSignature,
+			ShouldFail: false,
+		},
+		{
+			Key:        eccKey,
+			Signature:  []byte{},
+			ShouldFail: true,
+		},
+		{
+			Key:        eccKey,
+			Signature:  append(eccSignature, []byte{0x00, 0x00, 0x00}...),
+			ShouldFail: true,
+		},
+		{
+			Key:        eccKey,
+			Signature:  invalidecdsaSignature,
+			ShouldFail: true,
+		},
+		{
+			Key:        eccKey,
+			Signature:  invalidecdsaSignatureValues,
+			ShouldFail: true,
+		},
+		{
+			Key: mock.CryptoSigner{
+				PublicKey: &dsa.PublicKey{},
+			},
+			Signature:  []byte{},
+			ShouldFail: true,
+		},
+	}
+
+	for _, test := range tests {
+		err = checkSignature(digest, test.Signature, hashType, test.Key.Public())
+		if test.ShouldFail {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+
 }
