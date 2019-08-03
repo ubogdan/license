@@ -56,7 +56,7 @@ const (
 	   		},
 	   	}
 	*/
-	testLicense1pem = "MIIBCjCBrhMMVGVzdCBQcm9kdWN0Ex0wNTcxNy00M0Q4Ni04MUMwOC1ENjEzMC1GMDkwQzAPEw1UZXN0IEN1c3RvbWVyMCYXETE5MDEwMTAyMDAwMCswMjAwFxExOTEyMzAwMjAwMDArMDIwMDAkMAsGBisGAQMCAQIBATALBgYrBgEDAgICAQowCAYGKwYBAwIDBBRkW6+UMR6rypJQW0vY02eRmKMhrjAKBggqhkjOPQQDAjBXMAoGCCqGSM49BAMCA0kAMEYCIQDs7mH2DoRKrLd5ZjUg87Ms/KPEE+E7pfeTVxDz0ur6mAIhAItLQnfNKdMCAJpxjqbdV8nCEeBGjYP0/jXaYJtIOkqs"
+	//testLicense1pem = "MIIBCjCBrhMMVGVzdCBQcm9kdWN0Ex0wNTcxNy00M0Q4Ni04MUMwOC1ENjEzMC1GMDkwQzAPEw1UZXN0IEN1c3RvbWVyMCYXETE5MDEwMTAyMDAwMCswMjAwFxExOTEyMzAwMjAwMDArMDIwMDAkMAsGBisGAQMCAQIBATALBgYrBgEDAgICAQowCAYGKwYBAwIDBBRkW6+UMR6rypJQW0vY02eRmKMhrjAKBggqhkjOPQQDAjBXMAoGCCqGSM49BAMCA0kAMEYCIQDs7mH2DoRKrLd5ZjUg87Ms/KPEE+E7pfeTVxDz0ur6mAIhAItLQnfNKdMCAJpxjqbdV8nCEeBGjYP0/jXaYJtIOkqs"
 
 	/*
 		License{
@@ -84,7 +84,7 @@ const (
 			},
 		}
 	*/
-	testLicense2pem = "MIIBQTCB5hMMVGVzdCBQcm9kdWN0Ex0wNTcxNy00M0Q4Ni04MUMwOC1ENjEzMC1GMDkwQzA5Ew1UZXN0IEN1c3RvbWVyEwJVUxMITmV3IFlvcmsTCFRFU1QgTExDExBTYWxlcyBEZXBhcnRtZW50MCYXETE5MDEwMTAyMDAwMCswMjAwFxExOTEyMzAwMjAwMDArMDIwMDAyMAsGBisGAQMBAQIBZDAMBgYrBgEDAQICAgPoMAsGBisGAQMCAQIBATAIBgYrBgEDAgIEFGRbr5QxHqvKklBbS9jTZ5GYoyGuMAoGCCqGSM49BAMCMFYwCgYIKoZIzj0EAwIDSAAwRQIhAM3veaQ7Tut6RTKtvFRkw4Tdw2JjBhVA0oHe3WLZgO0+AiAcGxXdRqsrDYTzU4T7iQbiciKMGpaHPvyIYhndlBkY0A=="
+	//testLicense2pem = "MIIBQTCB5hMMVGVzdCBQcm9kdWN0Ex0wNTcxNy00M0Q4Ni04MUMwOC1ENjEzMC1GMDkwQzA5Ew1UZXN0IEN1c3RvbWVyEwJVUxMITmV3IFlvcmsTCFRFU1QgTExDExBTYWxlcyBEZXBhcnRtZW50MCYXETE5MDEwMTAyMDAwMCswMjAwFxExOTEyMzAwMjAwMDArMDIwMDAyMAsGBisGAQMBAQIBZDAMBgYrBgEDAQICAgPoMAsGBisGAQMCAQIBATAIBgYrBgEDAgIEFGRbr5QxHqvKklBbS9jTZ5GYoyGuMAoGCCqGSM49BAMCMFYwCgYIKoZIzj0EAwIDSAAwRQIhAM3veaQ7Tut6RTKtvFRkw4Tdw2JjBhVA0oHe3WLZgO0+AiAcGxXdRqsrDYTzU4T7iQbiciKMGpaHPvyIYhndlBkY0A=="
 )
 
 func TestCreateLicense(t *testing.T) {
@@ -157,7 +157,28 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 	privateEcc, err := x509.ParseECPrivateKey(derBytes)
 	assert.NoError(t, err)
 
-	testLicense1, err := base64.StdEncoding.DecodeString(testLicense1pem)
+	testLicense1, err := CreateLicense(&License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+		ValidFrom:    time.Unix(testLicenseValidFrom, 0),
+		ValidUntil:   time.Unix(testLicenseValidUntil, 0),
+		Customer: Customer{
+			Name: testLicenseCustomerName,
+		},
+		Features: []Feature{
+			{
+				Oid:   asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 1},
+				Limit: 1,
+			},
+			{
+				Oid:   asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 2},
+				Limit: 10,
+			},
+			{
+				Oid: asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 3},
+			},
+		},
+	}, privateEcc)
 	assert.NoError(t, err)
 
 	license := &License{}
@@ -199,35 +220,62 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 }
 
 func TestLoadLicenseWithWrongAuthority(t *testing.T) {
-	testLicense1, err := base64.StdEncoding.DecodeString(testLicense1pem)
-	assert.NoError(t, err)
 
-	testLicense2, err := base64.StdEncoding.DecodeString(testLicense1pem)
-	assert.NoError(t, err)
-
-	license := &License{}
-
-	// Random Authority
-	privateEcc, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-	// Parse
-	err = license.Load(testLicense1, privateEcc.Public())
-	assert.Error(t, err)
-
-	// Parse
-	err = license.Load(testLicense2, privateEcc.Public())
-	assert.Error(t, err)
-}
-
-func TestLoadLicenseWithVersion(t *testing.T) {
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
 
 	privateEcc, err := x509.ParseECPrivateKey(derBytes)
 	assert.NoError(t, err)
 
-	testLicense2, err := base64.StdEncoding.DecodeString(testLicense2pem)
+	testLicense1, err := CreateLicense(&License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+	}, privateEcc)
 	assert.NoError(t, err)
+
+	license := &License{}
+
+	// Random Authority
+	privateEcc, _ = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Parse
+	err = license.Load(testLicense1, privateEcc.Public())
+	assert.Error(t, err)
+
+}
+
+func TestLoadLicenseWithVersion(t *testing.T) {
+
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	testLicense, err := CreateLicense(&License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+		ValidFrom:    time.Unix(testLicenseValidFrom, 0),
+		ValidUntil:   time.Unix(testLicenseValidUntil, 0),
+		MinVersion:   testLicenseMinVersion,
+		MaxVersion:   testLicenseMaxVersion,
+		Customer: Customer{
+			Name:               testLicenseCustomerName,
+			City:               testLicenseCustomerCity,
+			Country:            testLicenseCustomerCountry,
+			Organization:       testLicenseCustomerOrganization,
+			OrganizationalUnit: testLicenseCustomerOrganizationalUnit,
+		},
+		Features: []Feature{
+			{
+				Oid:   asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 1},
+				Limit: 1,
+			},
+			{
+				Oid: asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 2},
+			},
+		},
+	}, privateEcc)
 
 	license := &License{}
 
@@ -238,7 +286,7 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Parse
-	err = license.Load(testLicense2, privateEcc.Public())
+	err = license.Load(testLicense, privateEcc.Public())
 	assert.NoError(t, err)
 
 	assert.Equalf(t, testLicenseProduct, license.ProductName, "Invalid product")
@@ -335,17 +383,26 @@ func TestLoadLicenseCorrupt(t *testing.T) {
 
 func TestLoadLicenseInvalidKey(t *testing.T) {
 
-	dsaKey := &mock.CryptoSigner{
-		PublicKey: &dsa.PublicKey{},
-	}
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
 
-	testLicense2, err := base64.StdEncoding.DecodeString(testLicense1pem)
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	testLicense, err := CreateLicense(&License{
+		ProductName:  testLicenseProduct,
+		SerialNumber: testLicenseSerial,
+	}, privateEcc)
 	assert.NoError(t, err)
 
 	license := &License{}
 
+	dsaKey := &mock.CryptoSigner{
+		PublicKey: &dsa.PublicKey{},
+	}
+
 	// Parse
-	err = license.Load(testLicense2, dsaKey)
+	err = license.Load(testLicense, dsaKey)
 	assert.Error(t, err)
 
 }

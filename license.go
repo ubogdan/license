@@ -41,7 +41,8 @@ type asnSignedLicense struct {
 	ProductName        string
 	SerialNumber       string
 	Customer           Customer
-	Validity           Validity
+	ValidFrom          int64
+	ValidUntil         int64
 	Features           []asnFeature
 	AuthorityKeyId     []byte
 	SignatureAlgorithm pkix.AlgorithmIdentifier
@@ -91,7 +92,8 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		ProductName:        template.ProductName,
 		SerialNumber:       template.SerialNumber,
 		Customer:           template.Customer,
-		Validity:           Validity{From: template.ValidFrom, Until: template.ValidUntil},
+		ValidFrom:          template.ValidFrom.Unix(),
+		ValidUntil:         template.ValidUntil.Unix(),
 		Features:           features,
 		AuthorityKeyId:     authorityKeyId,
 		SignatureAlgorithm: signatureAlgorithm,
@@ -134,7 +136,6 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
 		return errors.New("license: invalid AuthorityId")
 	}
-
 	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm.Algorithm)
 	if err != nil {
 		return err
@@ -157,11 +158,13 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 			return err
 		}
 	}
-	l.SerialNumber = license.SerialNumber
 
-	if license.Validity.IsValid(time.Now()) {
-		l.ValidFrom = license.Validity.From
-		l.ValidUntil = license.Validity.Until
+	l.SerialNumber = license.SerialNumber
+	if license.ValidFrom > 0 {
+		l.ValidFrom = time.Unix(license.ValidFrom, 0)
+	}
+	if license.ValidUntil > 0 {
+		l.ValidUntil = time.Unix(license.ValidUntil, 0)
 	}
 	l.Customer = license.Customer
 
