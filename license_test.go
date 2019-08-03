@@ -172,7 +172,7 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 	err = license.RegisterFeature(feat2name, feat2oid)
 
 	// Parse
-	err = license.Load(testLicense1, privateEcc.PublicKey)
+	err = license.Load(testLicense1, privateEcc.Public())
 	assert.NoError(t, err)
 
 	assert.Equalf(t, testLicenseProduct, license.ProductName, "Invalid product")
@@ -216,7 +216,7 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Parse
-	err = license.Load(testLicense2, privateEcc.PublicKey)
+	err = license.Load(testLicense2, privateEcc.Public())
 	assert.NoError(t, err)
 
 	assert.Equalf(t, testLicenseProduct, license.ProductName, "Invalid product")

@@ -11,6 +11,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"hash"
+	"math/big"
 )
 
 var (
@@ -22,6 +23,10 @@ var (
 	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
+
+	ErrUnsupportedAlgorithm = errors.New("license: cannot verify signature: algorithm unimplemented")
+	ErrUnsupportedKey       = errors.New("license: only RSA and ECDSA keys supported")
+	ErrrUnsupportedElliptic = errors.New("license: unknown elliptic curve")
 )
 
 var signatureAlgorithmDetails = []struct {
@@ -63,11 +68,11 @@ func hashFromPublicKey(key interface{}) (crypto.Hash, pkix.AlgorithmIdentifier, 
 			hashFunc = crypto.SHA512
 			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA512
 		default:
-			return hashFunc, signatureAlgorithm, errors.New("license: unknown elliptic curve")
+			return hashFunc, signatureAlgorithm, ErrrUnsupportedElliptic
 		}
 
 	default:
-		return hashFunc, signatureAlgorithm, errors.New("license: only RSA and ECDSA keys supported")
+		return hashFunc, signatureAlgorithm, ErrUnsupportedKey
 	}
 
 	return hashFunc, signatureAlgorithm, nil
@@ -80,7 +85,7 @@ func hashFuncFromAlgorithm(alogrihm asn1.ObjectIdentifier) (hashFunc crypto.Hash
 			return match.hash, nil
 		}
 	}
-	return hashFunc, errors.New("license: invalid Signature Algorithm")
+	return hashFunc, ErrUnsupportedAlgorithm
 }
 
 // public key digest
@@ -94,6 +99,36 @@ func publicKeySignature(publicKey interface{}) ([]byte, error) {
 	digest.Write(sigBytes)
 
 	return digest.Sum(nil), nil
+}
+
+func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey crypto.PublicKey) (err error) {
+	type ecdsaSignature struct {
+		R, S *big.Int
+	}
+
+	if !hashType.Available() {
+		return ErrUnsupportedAlgorithm
+	}
+
+	switch pub := publicKey.(type) {
+	case *rsa.PublicKey:
+		return rsa.VerifyPKCS1v15(pub, hashType, digest, signature)
+	case *ecdsa.PublicKey:
+		ecdsaSig := new(ecdsaSignature)
+		if rest, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
+			return err
+		} else if len(rest) != 0 {
+			return errors.New("license: trailing data after ECDSA signature")
+		}
+		if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 {
+			return errors.New("license: ECDSA signature contained zero or negative values")
+		}
+		if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
+			return errors.New("license: ECDSA verification failure")
+		}
+		return
+	}
+	return ErrUnsupportedAlgorithm
 }
 
 // calculate hash for object

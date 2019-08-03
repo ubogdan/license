@@ -1,9 +1,9 @@
 package license
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
-
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
@@ -117,7 +117,7 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 }
 
 // TODO snValidate Handler
-func (l *License) Load(asn1Data []byte, pubKey interface{}) error {
+func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	var licObject asnLicense
 	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {
 		return err
@@ -125,19 +125,31 @@ func (l *License) Load(asn1Data []byte, pubKey interface{}) error {
 		return errors.New("license: trailing data")
 	}
 
-	hashFunc, err := hashFuncFromAlgorithm(licObject.Signature.Algorithm)
+	authorityKeyId, err := publicKeySignature(publicKey)
 	if err != nil {
 		return err
-	}
-	digest, err := asnObjectSignature(licObject.License, hashFunc.New())
-	if err != nil {
-		return err
-	}
-	// TODO Validate signature
-	if len(digest) == 0 {
-
 	}
 	license := licObject.License
+
+	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
+		return errors.New("license: invalid AuthorityId")
+	}
+
+	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm.Algorithm)
+	if err != nil {
+		return err
+	}
+
+	digest, err := asnObjectSignature(license, hashFunc.New())
+	if err != nil {
+		return err
+	}
+
+	err = checkSignature(digest, licObject.Signature.Value.Bytes, hashFunc, publicKey)
+	if err != nil {
+		return err
+	}
+
 	l.ProductName = license.ProductName
 	l.SerialNumber = license.SerialNumber
 
