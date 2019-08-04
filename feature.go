@@ -11,7 +11,7 @@ var (
 	ErrFeatureAllreadyExists = errors.New("license: Feature already exists")
 )
 
-// Register Feature - register a feature into license registry so it will be recognized at Load time
+// RegisterFeature - register a feature into license registry so it will be recognized at Load time
 func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error {
 	if l.knownFeatures == nil {
 		l.knownFeatures = make(map[string]string)
@@ -25,7 +25,7 @@ func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error 
 	return nil
 }
 
-// Get Geature return the feature name and limit
+// GetFeature - return the feature name and limit
 func (l *License) GetFeature(oid asn1.ObjectIdentifier) (string, int64, error) {
 	for _, feature := range l.Features {
 		if feature.Oid.Equal(oid) {

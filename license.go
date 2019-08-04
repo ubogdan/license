@@ -26,13 +26,13 @@ type License struct {
 	MaxVersion   int64     `json:"max_version,omitempty"`
 	Features     []Feature `json:"features"`
 
-	// Handle serial number validation durring Load
+	// Handle serial number validation during Load
 	SerialNumberValidator func(serial string) error
 	knownFeatures         map[string]string
 	signature             asnSignature
 }
 
-// License Customer Info
+// Customer godoc
 type Customer struct {
 	Name               string
 	Country            string `asn1:"optional,omitempty"`
@@ -41,7 +41,7 @@ type Customer struct {
 	OrganizationalUnit string `asn1:"optional,omitempty"`
 }
 
-// License Features
+// License godoc
 type Feature struct {
 	Oid         asn1.ObjectIdentifier `json:"-"`
 	Description string                `json:"description"`
