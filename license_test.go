@@ -192,6 +192,7 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 	feat2name := "Feature2"
 	feat2oid := asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 2}
 	err = license.RegisterFeature(feat2name, feat2oid)
+	assert.NoError(t, err)
 
 	// Parse
 	err = license.Load(testLicense1, privateEcc.Public())

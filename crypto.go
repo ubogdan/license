@@ -24,6 +24,7 @@ var (
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
 
+	// Cryptographic Errors
 	ErrUnsupportedAlgorithm = errors.New("license: cannot verify signature: algorithm unimplemented")
 	ErrUnsupportedKey       = errors.New("license: only RSA and ECDSA keys supported")
 	ErrUnsupportedElliptic  = errors.New("license: unknown elliptic curve")
