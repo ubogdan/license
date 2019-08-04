@@ -27,7 +27,7 @@ type License struct {
 	Features     []Feature `json:"features"`
 
 	// Handle serial number validation during Load
-	SerialNumberValidator func(serial string) error
+	SerialNumberValidator func(product, serial string) error
 	knownFeatures         map[string]string
 	signature             asnSignature
 }
@@ -41,7 +41,7 @@ type Customer struct {
 	OrganizationalUnit string `asn1:"optional,omitempty"`
 }
 
-// License godoc
+// Feature godoc
 type Feature struct {
 	Oid         asn1.ObjectIdentifier `json:"-"`
 	Description string                `json:"description"`
@@ -74,7 +74,7 @@ type asnLicense struct {
 	Signature asnSignature
 }
 
-// Create License ussing License template.
+// CreateLicense godoc.
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 
 	if key == nil {
@@ -147,7 +147,7 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	license := licObject.License
 
 	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
-		return errors.New("license: invalid AuthorityId")
+		return errors.New("invalid AuthorityId")
 	}
 	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm.Algorithm)
 	if err != nil {
@@ -164,15 +164,16 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return err
 	}
 
-	l.ProductName = license.ProductName
-	if l.SerialNumberValidator != nil {
-		err := l.SerialNumberValidator(license.SerialNumber)
-		if err != nil {
-			return err
-		}
+	err = l.setSoftwareInfo(license.ProductName, license.SerialNumber)
+	if err != nil {
+		return err
 	}
 
-	l.SerialNumber = license.SerialNumber
+	err = l.setFeaturesInfo(license.Features)
+	if err != nil {
+		return err
+	}
+
 	if license.ValidFrom > 0 {
 		l.ValidFrom = time.Unix(license.ValidFrom, 0)
 	}
@@ -181,9 +182,27 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	}
 	l.Customer = license.Customer
 
+	l.signature = licObject.Signature
+
+	return nil
+}
+
+func (l *License) setSoftwareInfo(product, sn string) error {
+	if l.SerialNumberValidator != nil {
+		err := l.SerialNumberValidator(product, sn)
+		if err != nil {
+			return err
+		}
+	}
+	l.ProductName = product
+	l.SerialNumber = sn
+	return nil
+}
+
+func (l *License) setFeaturesInfo(features []asnFeature) error {
 	// Clear old features
 	l.Features = []Feature{}
-	for _, feature := range license.Features {
+	for _, feature := range features {
 		switch {
 		case feature.Oid.Equal(oidLicenseMinVersion):
 			l.MinVersion = feature.Limit
@@ -197,8 +216,5 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 			l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
 		}
 	}
-
-	l.signature = licObject.Signature
-
 	return nil
 }
