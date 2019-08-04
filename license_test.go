@@ -340,7 +340,7 @@ func TestLoadLicenseWithSerial(t *testing.T) {
 	assert.NoError(t, err)
 
 	license := &License{
-		SerialNumberValidator: func(sn string) error {
+		SerialNumberValidator: func(produc, sn string) error {
 			if sn == testLicenseSerial {
 				return nil
 			}
