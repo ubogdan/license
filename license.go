@@ -15,27 +15,38 @@ var (
 	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
 )
 
+// License godoc
 type License struct {
-	ProductName           string    `json:"product"`
-	SerialNumber          string    `json:"serial"`
-	Customer              Customer  `json:"customer"`
-	ValidFrom             time.Time `json:"valid_from,omitempty" asn1:"default:0"`
-	ValidUntil            time.Time `json:"valid_until,omitempty" asn1:"default:0"`
-	MinVersion            int64     `json:"min_version,omitempty" asn1:"default:0"`
-	MaxVersion            int64     `json:"max_version,omitempty" asn1:"default:0"`
-	Features              []Feature `json:"features"`
-	knownFeatures         map[string]string
+	ProductName  string    `json:"product"`
+	SerialNumber string    `json:"serial"`
+	Customer     Customer  `json:"customer"`
+	ValidFrom    time.Time `json:"valid_from,omitempty"`
+	ValidUntil   time.Time `json:"valid_until,omitempty"`
+	MinVersion   int64     `json:"min_version,omitempty"`
+	MaxVersion   int64     `json:"max_version,omitempty"`
+	Features     []Feature `json:"features"`
+
+	// Handle serial number validation durring Load
 	SerialNumberValidator func(serial string) error
+	knownFeatures         map[string]string
 	signature             asnSignature
 }
 
+// License Customer Info
+type Customer struct {
+	Name               string
+	Country            string `asn1:"optional,omitempty"`
+	City               string `asn1:"optional,omitempty"`
+	Organization       string `asn1:"optional,omitempty"`
+	OrganizationalUnit string `asn1:"optional,omitempty"`
+}
+
+// License Features
 type Feature struct {
 	Oid         asn1.ObjectIdentifier `json:"-"`
 	Description string                `json:"description"`
 	Limit       int64                 `json:"limit"`
 }
-
-type SerialNumberValidator func(license *License) error
 
 type asnSignedLicense struct {
 	ProductName        string
@@ -63,6 +74,7 @@ type asnLicense struct {
 	Signature asnSignature
 }
 
+// Create License ussing License template.
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 
 	if key == nil {
@@ -119,6 +131,7 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	return asn1.Marshal(*licObject)
 }
 
+// Load a license.
 func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	var licObject asnLicense
 	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {

@@ -189,7 +189,7 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 	err = license.RegisterFeature(feat1name, feat1oid)
 	assert.NoError(t, err)
 
-	feat2name := "Feature1"
+	feat2name := "Feature2"
 	feat2oid := asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 2}
 	err = license.RegisterFeature(feat2name, feat2oid)
 
@@ -276,6 +276,7 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 			},
 		},
 	}, privateEcc)
+	assert.NoError(t, err)
 
 	license := &License{}
 
@@ -331,9 +332,11 @@ func TestLoadLicenseWithSerial(t *testing.T) {
 	}
 	// Valid SN
 	testLicense1, err := CreateLicense(genLicense, privateEcc)
+	assert.NoError(t, err)
 
 	genLicense.SerialNumber = "Invalid Serial Number"
 	testLicense2, err := CreateLicense(genLicense, privateEcc)
+	assert.NoError(t, err)
 
 	license := &License{
 		SerialNumberValidator: func(sn string) error {
@@ -365,6 +368,7 @@ func TestLoadLicenseCorrupt(t *testing.T) {
 		SerialNumber: testLicenseSerial,
 	}
 	testLicense, err := CreateLicense(genLicense, privateEcc)
+	assert.NoError(t, err)
 
 	// Corrupted data
 	corrupteLicense := append(testLicense[3:], testLicense[:3]...)

@@ -26,7 +26,7 @@ var (
 
 	ErrUnsupportedAlgorithm = errors.New("license: cannot verify signature: algorithm unimplemented")
 	ErrUnsupportedKey       = errors.New("license: only RSA and ECDSA keys supported")
-	ErrrUnsupportedElliptic = errors.New("license: unknown elliptic curve")
+	ErrUnsupportedElliptic  = errors.New("license: unknown elliptic curve")
 )
 
 var signatureAlgorithmDetails = []struct {
@@ -68,7 +68,7 @@ func hashFromPublicKey(key interface{}) (crypto.Hash, pkix.AlgorithmIdentifier, 
 			hashFunc = crypto.SHA512
 			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA512
 		default:
-			return hashFunc, signatureAlgorithm, ErrrUnsupportedElliptic
+			return hashFunc, signatureAlgorithm, ErrUnsupportedElliptic
 		}
 
 	default:

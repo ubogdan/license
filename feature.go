@@ -7,7 +7,7 @@ import (
 
 var (
 	ErrNoSuchFeature         = errors.New("license: No such feature")
-	ErrFeatureAllreadyExists = errors.New("license: Feature allready exists")
+	ErrFeatureAllreadyExists = errors.New("license: Feature already exists")
 )
 
 func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error {
