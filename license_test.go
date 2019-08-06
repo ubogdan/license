@@ -7,7 +7,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
@@ -149,6 +148,61 @@ func TestCreateLicense(t *testing.T) {
 	}
 }
 
+func TestLoadLicenseWithCustomer(t *testing.T) {
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	encoded := &License{
+		SerialNumber: testLicenseSerial,
+		ValidFrom:    time.Unix(testLicenseValidFrom, 0),
+		ValidUntil:   time.Unix(testLicenseValidUntil, 0),
+		Customer: Customer{
+			Name:         testLicenseCustomerName,
+			City:         testLicenseCustomerCity,
+			Organization: testLicenseCustomerOrganization,
+		},
+	}
+	data, err := CreateLicense(encoded, privateEcc)
+	assert.NoError(t, err)
+
+	decoder := &License{}
+	err = decoder.Load(data, privateEcc.Public())
+	assert.NoError(t, err)
+
+	assert.Equalf(t, encoded.SerialNumber, decoder.SerialNumber, "Invalid Serial")
+
+	assert.Equalf(t, encoded.Customer.Name, decoder.Customer.Name, "Invalid Customer")
+	assert.Equalf(t, encoded.Customer.City, decoder.Customer.City, "Invalid customer City")
+	assert.Equalf(t, encoded.Customer.Country, decoder.Customer.Country, "Invalid customer Country")
+	assert.Equalf(t, encoded.Customer.Organization, decoder.Customer.Organization, "Invalid customer Organization")
+	assert.Equalf(t, encoded.Customer.OrganizationalUnit, decoder.Customer.OrganizationalUnit, "Invalid customer OrganizationalUnit")
+
+	encoded = &License{
+		Customer: Customer{
+			City:               testLicenseCustomerCity,
+			Country:            testLicenseCustomerCountry,
+			OrganizationalUnit: testLicenseCustomerOrganizationalUnit,
+		},
+	}
+
+	data, err = CreateLicense(encoded, privateEcc)
+	assert.NoError(t, err)
+
+	decoder = &License{}
+	err = decoder.Load(data, privateEcc.Public())
+	assert.NoError(t, err)
+
+	assert.Equalf(t, encoded.Customer.Name, decoder.Customer.Name, "Invalid Customer")
+	assert.Equalf(t, encoded.Customer.City, decoder.Customer.City, "Invalid customer City")
+	assert.Equalf(t, encoded.Customer.Country, decoder.Customer.Country, "Invalid customer Country")
+	assert.Equalf(t, encoded.Customer.Organization, decoder.Customer.Organization, "Invalid customer Organization")
+	assert.Equalf(t, encoded.Customer.OrganizationalUnit, decoder.Customer.OrganizationalUnit, "Invalid customer OrganizationalUnit")
+
+}
+
 func TestLoadLicenseWithFeatures(t *testing.T) {
 
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
@@ -208,12 +262,12 @@ func TestLoadLicenseWithFeatures(t *testing.T) {
 
 	assert.Equalf(t, testLicenseCustomerName, license.Customer.Name, "Invalid customer")
 
-	name, limit, err := license.GetFeature(feat1oid)
+	name, _, limit, err := license.GetFeature(feat1oid)
 	assert.NoError(t, err)
 	assert.Equalf(t, feat1name, name, "Feature name is Feature1")
 	assert.Equalf(t, int64(1), limit, "Feature is limited to 1")
 
-	name, limit, err = license.GetFeature(feat2oid)
+	name, _, limit, err = license.GetFeature(feat2oid)
 	assert.NoError(t, err)
 	assert.Equalf(t, feat2name, name, "Feature name is Feature2")
 	assert.Equalf(t, int64(10), limit, "Feature is limited to 10")
@@ -245,6 +299,44 @@ func TestLoadLicenseWithWrongAuthority(t *testing.T) {
 
 }
 
+func TestLoadLicenseWithExpire(t *testing.T) {
+
+	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
+	assert.NoError(t, err)
+
+	privateEcc, err := x509.ParseECPrivateKey(derBytes)
+	assert.NoError(t, err)
+
+	encoded := &License{
+		ProductName: testLicenseProduct,
+		ValidUntil:  time.Unix(1575158400, 0),
+	}
+
+	data, err := CreateLicense(encoded, privateEcc)
+	assert.NoError(t, err)
+
+	decoded := &License{}
+	err = decoded.Load(data, privateEcc.Public())
+	assert.NoError(t, err)
+
+	assert.Equalf(t, encoded.ValidFrom, decoded.ValidFrom, "Invalid min version")
+	assert.Equalf(t, encoded.ValidUntil, decoded.ValidUntil, "Invalid max version")
+
+	encoded = &License{
+		ValidFrom: time.Unix(1575158400, 0),
+	}
+
+	data, err = CreateLicense(encoded, privateEcc)
+	assert.NoError(t, err)
+
+	err = decoded.Load(data, privateEcc.Public())
+	assert.NoError(t, err)
+
+	assert.Equalf(t, encoded.ValidFrom, decoded.ValidFrom, "Invalid min version")
+	assert.Equalf(t, encoded.ValidUntil, decoded.ValidUntil, "Invalid max version")
+
+}
+
 func TestLoadLicenseWithVersion(t *testing.T) {
 
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
@@ -256,62 +348,17 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 	testLicense, err := CreateLicense(&License{
 		ProductName:  testLicenseProduct,
 		SerialNumber: testLicenseSerial,
-		ValidFrom:    time.Unix(testLicenseValidFrom, 0),
-		ValidUntil:   time.Unix(testLicenseValidUntil, 0),
 		MinVersion:   testLicenseMinVersion,
 		MaxVersion:   testLicenseMaxVersion,
-		Customer: Customer{
-			Name:               testLicenseCustomerName,
-			City:               testLicenseCustomerCity,
-			Country:            testLicenseCustomerCountry,
-			Organization:       testLicenseCustomerOrganization,
-			OrganizationalUnit: testLicenseCustomerOrganizationalUnit,
-		},
-		Features: []Feature{
-			{
-				Oid:   asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 1},
-				Limit: 1,
-			},
-			{
-				Oid: asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 2},
-			},
-		},
 	}, privateEcc)
 	assert.NoError(t, err)
 
 	license := &License{}
-
-	// Register Features
-	feat1name := "Feature1"
-	feat1oid := asn1.ObjectIdentifier{1, 3, 6, 1, 3, 2, 1}
-	err = license.RegisterFeature(feat1name, feat1oid)
-	assert.NoError(t, err)
-
-	// Parse
 	err = license.Load(testLicense, privateEcc.Public())
 	assert.NoError(t, err)
 
-	assert.Equalf(t, testLicenseProduct, license.ProductName, "Invalid product")
-
-	assert.Equalf(t, testLicenseSerial, license.SerialNumber, "Invalid serial")
-
-	assert.Equalf(t, time.Unix(testLicenseValidFrom, 0), license.ValidFrom, "Invalid from interval")
-
-	assert.Equalf(t, time.Unix(testLicenseValidUntil, 0), license.ValidUntil, "Invalid until interval")
-
 	assert.Equalf(t, int64(testLicenseMinVersion), license.MinVersion, "Invalid min version")
-
 	assert.Equalf(t, int64(testLicenseMaxVersion), license.MaxVersion, "Invalid max version")
-
-	assert.Equalf(t, testLicenseCustomerName, license.Customer.Name, "Invalid customer")
-
-	assert.Equalf(t, testLicenseCustomerCountry, license.Customer.Country, "Invalid customer Country")
-
-	assert.Equalf(t, testLicenseCustomerCity, license.Customer.City, "Invalid customer City")
-
-	assert.Equalf(t, testLicenseCustomerOrganization, license.Customer.Organization, "Invalid customer Organization")
-
-	assert.Equalf(t, testLicenseCustomerOrganizationalUnit, license.Customer.OrganizationalUnit, "Invalid customer OrganizationalUnit")
 
 }
 
@@ -421,14 +468,10 @@ func TestLoadLicenseInvalidAlorithm(t *testing.T) {
 
 	licObject := asnLicense{
 		License: asnSignedLicense{
-			SignatureAlgorithm: pkix.AlgorithmIdentifier{
-				Algorithm: oidLicenseMinVersion,
-			},
+			SignatureAlgorithm: oidLicenseMinVersion,
 		},
 		Signature: asnSignature{
-			AlgorithmIdentifier: pkix.AlgorithmIdentifier{
-				Algorithm: oidLicenseMinVersion,
-			},
+			AlgorithmIdentifier: oidLicenseMinVersion,
 		},
 	}
 

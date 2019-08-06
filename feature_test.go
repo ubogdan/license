@@ -81,7 +81,7 @@ func TestGetFeature(t *testing.T) {
 	l.RegisterFeature("Feature1", feature1oid)
 
 	for _, test := range tests {
-		_, _, err := l.GetFeature(test.Feature.Oid)
+		_, _, _, err := l.GetFeature(test.Feature.Oid)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {
