@@ -7,7 +7,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"hash"
@@ -42,27 +41,26 @@ var signatureAlgorithmDetails = []struct {
 	{x509.ECDSAWithSHA512, "ECDSA-SHA512", oidSignatureECDSAWithSHA512, x509.ECDSA, crypto.SHA512},
 }
 
-func hashFromPublicKey(key interface{}) (crypto.Hash, pkix.AlgorithmIdentifier, error) {
+func hashFromPublicKey(key interface{}) (crypto.Hash, asn1.ObjectIdentifier, error) {
 
-	var signatureAlgorithm pkix.AlgorithmIdentifier
+	var signatureAlgorithm asn1.ObjectIdentifier
 	var hashFunc crypto.Hash
 
 	switch pub := key.(type) {
 	case *rsa.PublicKey:
 		hashFunc = crypto.SHA256
-		signatureAlgorithm.Algorithm = oidSignatureSHA256WithRSA
-		signatureAlgorithm.Parameters = asn1.NullRawValue
+		signatureAlgorithm = oidSignatureSHA256WithRSA
 	case *ecdsa.PublicKey:
 		switch pub.Curve {
 		case elliptic.P224(), elliptic.P256():
 			hashFunc = crypto.SHA256
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA256
+			signatureAlgorithm = oidSignatureECDSAWithSHA256
 		case elliptic.P384():
 			hashFunc = crypto.SHA384
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA384
+			signatureAlgorithm = oidSignatureECDSAWithSHA384
 		case elliptic.P521():
 			hashFunc = crypto.SHA512
-			signatureAlgorithm.Algorithm = oidSignatureECDSAWithSHA512
+			signatureAlgorithm = oidSignatureECDSAWithSHA512
 		default:
 			return hashFunc, signatureAlgorithm, errors.New("unknown elliptic curve")
 		}

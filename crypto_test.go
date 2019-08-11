@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"hash"
@@ -84,14 +83,6 @@ func Test_hashFuncFromAlgorithm(t *testing.T) {
 			Oid:        oidSignatureSHA1WithRSA,
 			ShouldFail: false,
 		},
-		{
-			Oid:        oidLicenseMinVersion,
-			ShouldFail: true,
-		},
-		{
-			Oid:        oidLicenseMaxVersion,
-			ShouldFail: true,
-		},
 	}
 
 	for _, test := range tests {
@@ -131,9 +122,7 @@ func Test_asnObjectSignature(t *testing.T) {
 	}{
 		{
 			Data: asnSignedLicense{
-				SignatureAlgorithm: pkix.AlgorithmIdentifier{
-					Algorithm: oidSignatureECDSAWithSHA256,
-				},
+				SignatureAlgorithm: oidSignatureECDSAWithSHA256,
 			},
 			Hash:       sha1.New(),
 			ShouldFail: false,
@@ -145,9 +134,7 @@ func Test_asnObjectSignature(t *testing.T) {
 		},
 		{
 			Data: asnSignedLicense{
-				SignatureAlgorithm: pkix.AlgorithmIdentifier{
-					Algorithm: oidSignatureECDSAWithSHA256,
-				},
+				SignatureAlgorithm: oidSignatureECDSAWithSHA256,
 			},
 			Hash:       mocHash{},
 			ShouldFail: true,

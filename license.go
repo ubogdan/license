@@ -4,15 +4,9 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/rand"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"time"
-)
-
-var (
-	oidLicenseMinVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 1}
-	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
 )
 
 // License godoc
@@ -35,38 +29,53 @@ type License struct {
 // Customer godoc
 type Customer struct {
 	Name               string
-	Country            string `asn1:"optional,omitempty"`
-	City               string `asn1:"optional,omitempty"`
-	Organization       string `asn1:"optional,omitempty"`
-	OrganizationalUnit string `asn1:"optional,omitempty"`
+	Country            string
+	City               string
+	Organization       string
+	OrganizationalUnit string
 }
 
 // Feature godoc
 type Feature struct {
 	Oid         asn1.ObjectIdentifier `json:"-"`
 	Description string                `json:"description"`
+	Expire      int64                 `json:"expire,omitempty"`
 	Limit       int64                 `json:"limit"`
 }
 
 type asnSignedLicense struct {
-	ProductName        string
-	SerialNumber       string
-	Customer           Customer
-	ValidFrom          int64
-	ValidUntil         int64
-	Features           []asnFeature
+	Raw                asn1.RawContent
+	ProductName        string       `asn1:"optional,application,tag:0"`
+	SerialNumber       string       `asn1:"optional,application,tag:1"`
+	Customer           asnCustomer  `asn1:"optional,private,omitempty"`
+	ValidFrom          int64        `asn1:"optional,default:0"`
+	ValidUntil         int64        `asn1:"optional,default:0"`
+	MinVersion         int64        `asn1:"optional,default:0"`
+	MaxVersion         int64        `asn1:"optional,default:0"`
+	Features           []asnFeature `asn1:"optional,omitempty"`
 	AuthorityKeyId     []byte
-	SignatureAlgorithm pkix.AlgorithmIdentifier
+	SignatureAlgorithm asn1.ObjectIdentifier
+}
+
+type asnCustomer struct {
+	Raw                asn1.RawContent
+	Name               string `asn1:"optional,tag:0"`
+	Country            string `asn1:"optional,tag:1"`
+	City               string `asn1:"optional,tag:2"`
+	Organization       string `asn1:"optional,tag:3"`
+	OrganizationalUnit string `asn1:"optional,tag:4"`
 }
 
 type asnFeature struct {
-	Oid   asn1.ObjectIdentifier
-	Limit int64 `asn1:"optional,omitmepty"`
+	Raw    asn1.RawContent
+	Oid    asn1.ObjectIdentifier
+	Expire int64 `asn1:"optional,tag:1"`
+	Limit  int64 `asn1:"optional,tag:2"`
 }
 
 type asnSignature struct {
-	pkix.AlgorithmIdentifier
-	Value asn1.BitString
+	AlgorithmIdentifier asn1.ObjectIdentifier
+	Value               asn1.BitString
 }
 
 type asnLicense struct {
@@ -91,21 +100,24 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	}
 	var features []asnFeature
 
-	if template.MinVersion > 0 {
-		features = append(features, asnFeature{Oid: oidLicenseMinVersion, Limit: template.MinVersion})
-	}
-	if template.MaxVersion > 0 {
-		features = append(features, asnFeature{Oid: oidLicenseMaxVersion, Limit: template.MaxVersion})
-	}
 	for _, feature := range template.Features {
 		features = append(features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
+
 	tbsLicense := asnSignedLicense{
-		ProductName:        template.ProductName,
-		SerialNumber:       template.SerialNumber,
-		Customer:           template.Customer,
+		ProductName:  template.ProductName,
+		SerialNumber: template.SerialNumber,
+		Customer: asnCustomer{
+			Name:               template.Customer.Name,
+			Country:            template.Customer.Country,
+			City:               template.Customer.City,
+			Organization:       template.Customer.Organization,
+			OrganizationalUnit: template.Customer.OrganizationalUnit,
+		},
 		ValidFrom:          template.ValidFrom.Unix(),
 		ValidUntil:         template.ValidUntil.Unix(),
+		MinVersion:         template.MinVersion,
+		MaxVersion:         template.MaxVersion,
 		Features:           features,
 		AuthorityKeyId:     authorityKeyId,
 		SignatureAlgorithm: signatureAlgorithm,
@@ -149,7 +161,7 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
 		return errors.New("invalid AuthorityId")
 	}
-	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm.Algorithm)
+	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm)
 	if err != nil {
 		return err
 	}
@@ -164,7 +176,7 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return err
 	}
 
-	err = l.setSoftwareInfo(license.ProductName, license.SerialNumber)
+	err = l.setSoftwareInfo(license)
 	if err != nil {
 		return err
 	}
@@ -174,28 +186,44 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return err
 	}
 
-	if license.ValidFrom > 0 {
-		l.ValidFrom = time.Unix(license.ValidFrom, 0)
+	err = l.setCustomerInfo(license.Customer)
+	if err != nil {
+		return err
 	}
-	if license.ValidUntil > 0 {
-		l.ValidUntil = time.Unix(license.ValidUntil, 0)
-	}
-	l.Customer = license.Customer
 
 	l.signature = licObject.Signature
 
 	return nil
 }
 
-func (l *License) setSoftwareInfo(product, sn string) error {
+func (l *License) setSoftwareInfo(template asnSignedLicense) error {
 	if l.SerialNumberValidator != nil {
-		err := l.SerialNumberValidator(product, sn)
+		err := l.SerialNumberValidator(template.ProductName, template.SerialNumber)
 		if err != nil {
 			return err
 		}
 	}
-	l.ProductName = product
-	l.SerialNumber = sn
+	l.ProductName = template.ProductName
+	l.SerialNumber = template.SerialNumber
+	l.ValidFrom = time.Time{}
+	if template.ValidFrom > 0 {
+		l.ValidFrom = time.Unix(template.ValidFrom, 0)
+	}
+	l.ValidUntil = time.Time{}
+	if template.ValidUntil > 0 {
+		l.ValidUntil = time.Unix(template.ValidUntil, 0)
+	}
+	l.MinVersion = template.MinVersion
+	l.MaxVersion = template.MaxVersion
+	return nil
+}
+
+func (l *License) setCustomerInfo(customer asnCustomer) error {
+	l.Customer.Name = customer.Name
+	l.Customer.Country = customer.Country
+	l.Customer.City = customer.City
+	l.Customer.Organization = customer.Organization
+	l.Customer.OrganizationalUnit = customer.OrganizationalUnit
 	return nil
 }
 
@@ -203,18 +231,11 @@ func (l *License) setFeaturesInfo(features []asnFeature) error {
 	// Clear old features
 	l.Features = []Feature{}
 	for _, feature := range features {
-		switch {
-		case feature.Oid.Equal(oidLicenseMinVersion):
-			l.MinVersion = feature.Limit
-		case feature.Oid.Equal(oidLicenseMaxVersion):
-			l.MaxVersion = feature.Limit
-		default:
-			description, found := l.knownFeatures[feature.Oid.String()]
-			if !found {
-				continue
-			}
-			l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
+		description, found := l.knownFeatures[feature.Oid.String()]
+		if !found {
+			continue
 		}
+		l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
 	}
 	return nil
 }
