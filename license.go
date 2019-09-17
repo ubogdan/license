@@ -134,20 +134,14 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 // Load a license.
 func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	var licObject asnLicense
-	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {
-		return err
-	} else if len(rest) != 0 {
-		return errors.New("license: trailing data")
+	rest, err := asn1.Unmarshal(asn1Data, &licObject)
+	if err != nil || len(rest) != 0 {
+		return errors.New("license: mallformed data")
 	}
 
 	license := licObject.License
 
-	hashFunc, err := auhtorityhashFromAlgorithm(publicKey, license)
-	if err != nil {
-		return err
-	}
-
-	digest, err := asnObjectSignature(license, hashFunc.New())
+	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, license)
 	if err != nil {
 		return err
 	}
@@ -157,14 +151,9 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return err
 	}
 
-	err = l.setSoftwareInfo(license)
-	if err != nil {
-		return err
-	}
-
 	l.signature = licObject.Signature
 
-	return nil
+	return l.setSoftwareInfo(license)
 }
 
 func (l *License) setSoftwareInfo(template asnSignedLicense) error {

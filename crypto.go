@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
-	"hash"
 	"math/big"
 )
 
@@ -44,37 +43,24 @@ var signatureAlgorithmDetails = []struct {
 }
 
 // Identify Signature Algorithm by oid
-func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hashFunc crypto.Hash, err error) {
+func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash []byte, hashFunc crypto.Hash, err error) {
 	sigBytes, err := x509.MarshalPKIXPublicKey(key)
 	if err != nil {
-		return hashFunc, err
+		return nil, hashFunc, err
 	}
 	digest := sha1.New()
 	digest.Write(sigBytes)
 
 	if !bytes.Equal(digest.Sum(nil), license.AuthorityKeyID) {
-		return hashFunc, errors.New("invalid Authority Id")
+		return nil, hashFunc, errors.New("invalid Authority Id")
 	}
 
 	for _, match := range signatureAlgorithmDetails {
 		if license.SignatureAlgorithm.Equal(match.oid) {
-			return match.hash, nil
+			return asnLicenseHash(license, match.hash)
 		}
 	}
-	return hashFunc, errors.New("algorithm unimplemented")
-}
-
-// public key digest
-func publicKeySignature(publicKey interface{}) ([]byte, error) {
-	sigBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	digest := sha1.New()
-	digest.Write(sigBytes)
-
-	return digest.Sum(nil), nil
+	return nil, hashFunc, errors.New("algorithm unimplemented")
 }
 
 func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
@@ -146,28 +132,24 @@ func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey cr
 	return errors.New("cannot verify signature: only RSA and ECDSA keys supported")
 }
 
-// calculate hash for object
-func asnObjectSignature(data interface{}, hash hash.Hash) ([]byte, error) {
-	asnData, err := asn1.Marshal(data)
+func signAsnObject(license asnSignedLicense, key crypto.Signer, hash crypto.Hash) ([]byte, error) {
+	digest, _, err := asnLicenseHash(license, hash)
 	if err != nil {
 		return nil, err
 	}
-	_, err = hash.Write(asnData)
-	if err != nil {
-		return nil, err
-	}
-	return hash.Sum(nil), err
+	return key.Sign(rand.Reader, digest, hash)
 }
 
-func signAsnObject(data interface{}, key crypto.Signer, hash crypto.Hash) ([]byte, error) {
-	asnData, err := asn1.Marshal(data)
+func asnLicenseHash(license asnSignedLicense, h crypto.Hash) (hash []byte, hashFunc crypto.Hash, err error) {
+	asnData, err := asn1.Marshal(license)
 	if err != nil {
-		return nil, err
+		return nil, h, err
 	}
-	digest := hash.New()
+
+	digest := h.New()
 	_, err = digest.Write(asnData)
 	if err != nil {
-		return nil, err
+		return nil, h, err
 	}
-	return key.Sign(rand.Reader, digest.Sum(nil), hash)
+	return digest.Sum(nil), h, nil
 }

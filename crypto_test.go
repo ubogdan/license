@@ -7,10 +7,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"encoding/asn1"
 	"errors"
-	"hash"
 	"math/big"
 	"testing"
 
@@ -97,17 +95,6 @@ func Test_hashFuncFromAlgorithm(t *testing.T) {
 }
 */
 
-func Test_publicKeySignature(t *testing.T) {
-	var err error
-
-	rsaKey, _ := rsa.GenerateKey(rand.Reader, 1024)
-	_, err = publicKeySignature(rsaKey.Public())
-	assert.NoError(t, err)
-
-	_, err = publicKeySignature(rsaKey)
-	assert.Error(t, err)
-}
-
 type mocHash struct{}
 
 func (m mocHash) Write(p []byte) (n int, err error) { return 0, errors.New("Error") }
@@ -116,6 +103,7 @@ func (m mocHash) Size() int                         { return 0 }
 func (m mocHash) BlockSize() int                    { return 0 }
 func (m mocHash) Sum(b []byte) []byte               { return nil }
 
+/*
 func Test_asnObjectSignature(t *testing.T) {
 	tests := []struct {
 		Data       interface{}
@@ -152,6 +140,7 @@ func Test_asnObjectSignature(t *testing.T) {
 		}
 	}
 }
+*/
 
 func Test_checkSignature(t *testing.T) {
 	var err error
