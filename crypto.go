@@ -44,14 +44,13 @@ var signatureAlgorithmDetails = []struct {
 
 // Identify Signature Algorithm by oid
 func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash []byte, hashFunc crypto.Hash, err error) {
-	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+
+	digest, err := authorityHashFromKey(key)
 	if err != nil {
 		return nil, hashFunc, err
 	}
-	digest := sha1.New()
-	digest.Write(sigBytes)
 
-	if !bytes.Equal(digest.Sum(nil), license.AuthorityKeyID) {
+	if !bytes.Equal(digest, license.AuthorityKeyID) {
 		return nil, hashFunc, errors.New("invalid Authority Id")
 	}
 
@@ -60,6 +59,7 @@ func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash
 			return asnLicenseHash(license, match.hash)
 		}
 	}
+
 	return nil, hashFunc, errors.New("algorithm unimplemented")
 }
 
@@ -91,15 +91,12 @@ func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.Obje
 		return nil, hashFunc, signatureAlgorithm, errors.New("only RSA and ECDSA keys supported")
 	}
 
-	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+	digest, err := authorityHashFromKey(key)
 	if err != nil {
 		return nil, hashFunc, signatureAlgorithm, err
 	}
 
-	digest := sha1.New()
-	digest.Write(sigBytes)
-
-	return digest.Sum(nil), hashFunc, signatureAlgorithm, nil
+	return digest, hashFunc, signatureAlgorithm, nil
 }
 
 func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey crypto.PublicKey) (err error) {
@@ -128,6 +125,19 @@ func ecdsaVerifyPCKS(pub *ecdsa.PublicKey, digest, signature []byte) error {
 		return errors.New("license: verification failure")
 	}
 	return nil
+}
+
+func authorityHashFromKey(key interface{}) ([]byte, error) {
+	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return nil, err
+	}
+	digest := sha1.New()
+	_, err = digest.Write(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+	return digest.Sum(nil), nil
 }
 
 func signAsnObject(license asnSignedLicense, key crypto.Signer, hash crypto.Hash) ([]byte, error) {
