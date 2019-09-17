@@ -42,37 +42,6 @@ var signatureAlgorithmDetails = []struct {
 	{x509.ECDSAWithSHA512, "ECDSA-SHA512", oidSignatureECDSAWithSHA512, x509.ECDSA, crypto.SHA512},
 }
 
-func hashFromPublicKey(key interface{}) (crypto.Hash, asn1.ObjectIdentifier, error) {
-
-	var signatureAlgorithm asn1.ObjectIdentifier
-	var hashFunc crypto.Hash
-
-	switch pub := key.(type) {
-	case *rsa.PublicKey:
-		hashFunc = crypto.SHA256
-		signatureAlgorithm = oidSignatureSHA256WithRSA
-	case *ecdsa.PublicKey:
-		switch pub.Curve {
-		case elliptic.P224(), elliptic.P256():
-			hashFunc = crypto.SHA256
-			signatureAlgorithm = oidSignatureECDSAWithSHA256
-		case elliptic.P384():
-			hashFunc = crypto.SHA384
-			signatureAlgorithm = oidSignatureECDSAWithSHA384
-		case elliptic.P521():
-			hashFunc = crypto.SHA512
-			signatureAlgorithm = oidSignatureECDSAWithSHA512
-		default:
-			return hashFunc, signatureAlgorithm, errors.New("unknown elliptic curve")
-		}
-
-	default:
-		return hashFunc, signatureAlgorithm, errors.New("only RSA and ECDSA keys supported")
-	}
-
-	return hashFunc, signatureAlgorithm, nil
-}
-
 // Identify Signature Algorithm by oid
 func hashFuncFromAlgorithm(alogrihm asn1.ObjectIdentifier) (hashFunc crypto.Hash, err error) {
 	for _, match := range signatureAlgorithmDetails {
@@ -94,6 +63,45 @@ func publicKeySignature(publicKey interface{}) ([]byte, error) {
 	digest.Write(sigBytes)
 
 	return digest.Sum(nil), nil
+}
+
+func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
+
+	var signatureAlgorithm asn1.ObjectIdentifier
+	var hashFunc crypto.Hash
+
+	switch pub := key.(type) {
+	case *rsa.PublicKey:
+		hashFunc = crypto.SHA256
+		signatureAlgorithm = oidSignatureSHA256WithRSA
+	case *ecdsa.PublicKey:
+		switch pub.Curve {
+		case elliptic.P224(), elliptic.P256():
+			hashFunc = crypto.SHA256
+			signatureAlgorithm = oidSignatureECDSAWithSHA256
+		case elliptic.P384():
+			hashFunc = crypto.SHA384
+			signatureAlgorithm = oidSignatureECDSAWithSHA384
+		case elliptic.P521():
+			hashFunc = crypto.SHA512
+			signatureAlgorithm = oidSignatureECDSAWithSHA512
+		default:
+			return nil, hashFunc, signatureAlgorithm, errors.New("unknown elliptic curve")
+		}
+
+	default:
+		return nil, hashFunc, signatureAlgorithm, errors.New("only RSA and ECDSA keys supported")
+	}
+
+	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return nil, hashFunc, signatureAlgorithm, err
+	}
+
+	digest := sha1.New()
+	digest.Write(sigBytes)
+
+	return digest.Sum(nil), hashFunc, signatureAlgorithm, nil
 }
 
 func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey crypto.PublicKey) (err error) {

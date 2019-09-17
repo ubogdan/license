@@ -61,7 +61,7 @@ func Test_hashFromPublicKey(t *testing.T) {
 
 	for _, test := range tests {
 		pubkey := test.Key.Public()
-		_, _, err := hashFromPublicKey(pubkey)
+		_, _, _, err := auhtorityhashFromPublicKey(pubkey)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {

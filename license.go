@@ -88,19 +88,10 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
-	publicKey := key.Public()
-	authorityKeyId, err := publicKeySignature(publicKey)
-	if err != nil {
-		return nil, err
-	}
-	hashFunc, signatureAlgorithm, err := hashFromPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-	var features []asnFeature
 
-	for _, feature := range template.Features {
-		features = append(features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
+	authorityKeyId, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
+	if err != nil {
+		return nil, err
 	}
 
 	tbsLicense := asnSignedLicense{
@@ -117,9 +108,12 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		ValidUntil:         template.ValidUntil.Unix(),
 		MinVersion:         template.MinVersion,
 		MaxVersion:         template.MaxVersion,
-		Features:           features,
 		AuthorityKeyID:     authorityKeyId,
 		SignatureAlgorithm: signatureAlgorithm,
+	}
+
+	for _, feature := range template.Features {
+		tbsLicense.Features = append(tbsLicense.Features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
 
 	signature, err := signAsnObject(tbsLicense, key, hashFunc)
@@ -176,16 +170,6 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return err
 	}
 
-	err = l.setFeaturesInfo(license.Features)
-	if err != nil {
-		return err
-	}
-
-	err = l.setCustomerInfo(license.Customer)
-	if err != nil {
-		return err
-	}
-
 	l.signature = licObject.Signature
 
 	return nil
@@ -210,22 +194,17 @@ func (l *License) setSoftwareInfo(template asnSignedLicense) error {
 	}
 	l.MinVersion = template.MinVersion
 	l.MaxVersion = template.MaxVersion
-	return nil
-}
 
-func (l *License) setCustomerInfo(customer asnCustomer) error {
-	l.Customer.Name = customer.Name
-	l.Customer.Country = customer.Country
-	l.Customer.City = customer.City
-	l.Customer.Organization = customer.Organization
-	l.Customer.OrganizationalUnit = customer.OrganizationalUnit
-	return nil
-}
+	// Set customer info
+	l.Customer.Name = template.Customer.Name
+	l.Customer.Country = template.Customer.Country
+	l.Customer.City = template.Customer.City
+	l.Customer.Organization = template.Customer.Organization
+	l.Customer.OrganizationalUnit = template.Customer.OrganizationalUnit
 
-func (l *License) setFeaturesInfo(features []asnFeature) error {
-	// Clear old features
+	// Set features info
 	l.Features = []Feature{}
-	for _, feature := range features {
+	for _, feature := range template.Features {
 		description, found := l.knownFeatures[feature.Oid.String()]
 		if !found {
 			continue
