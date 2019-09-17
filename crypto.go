@@ -103,33 +103,31 @@ func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.Obje
 }
 
 func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey crypto.PublicKey) (err error) {
-	type ecdsaSignature struct {
-		R, S *big.Int
-	}
-
 	if !hashType.Available() {
 		return errors.New("cannot verify signature: algorithm unimplemented")
 	}
-
 	switch pub := publicKey.(type) {
 	case *rsa.PublicKey:
 		return rsa.VerifyPKCS1v15(pub, hashType, digest, signature)
 	case *ecdsa.PublicKey:
-		ecdsaSig := new(ecdsaSignature)
-		if rest, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
-			return err
-		} else if len(rest) != 0 {
-			return errors.New("trailing data after ECDSA signature")
-		}
-		if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 {
-			return errors.New("ECDSA signature contained zero or negative values")
-		}
-		if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
-			return errors.New("ECDSA verification failure")
-		}
-		return
+		return ecdsaVerifyPCKS(pub, digest, signature)
 	}
 	return errors.New("cannot verify signature: only RSA and ECDSA keys supported")
+}
+
+func ecdsaVerifyPCKS(pub *ecdsa.PublicKey, digest, signature []byte) error {
+	type ecdsaSignature struct {
+		R, S *big.Int
+	}
+	ecdsaSig := new(ecdsaSignature)
+	rest, err := asn1.Unmarshal(signature, ecdsaSig)
+	if err != nil || len(rest) != 0 {
+		return errors.New("license: mallformed data")
+	}
+	if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 || !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
+		return errors.New("license: verification failure")
+	}
+	return nil
 }
 
 func signAsnObject(license asnSignedLicense, key crypto.Signer, hash crypto.Hash) ([]byte, error) {
