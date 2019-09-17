@@ -1,6 +1,7 @@
 package license
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -43,9 +44,20 @@ var signatureAlgorithmDetails = []struct {
 }
 
 // Identify Signature Algorithm by oid
-func hashFuncFromAlgorithm(alogrihm asn1.ObjectIdentifier) (hashFunc crypto.Hash, err error) {
+func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hashFunc crypto.Hash, err error) {
+	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return hashFunc, err
+	}
+	digest := sha1.New()
+	digest.Write(sigBytes)
+
+	if !bytes.Equal(digest.Sum(nil), license.AuthorityKeyID) {
+		return hashFunc, errors.New("invalid Authority Id")
+	}
+
 	for _, match := range signatureAlgorithmDetails {
-		if alogrihm.Equal(match.oid) {
+		if license.SignatureAlgorithm.Equal(match.oid) {
 			return match.hash, nil
 		}
 	}

@@ -1,7 +1,6 @@
 package license
 
 import (
-	"bytes"
 	"crypto"
 	"encoding/asn1"
 	"errors"
@@ -141,16 +140,9 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 		return errors.New("license: trailing data")
 	}
 
-	authorityKeyId, err := publicKeySignature(publicKey)
-	if err != nil {
-		return err
-	}
 	license := licObject.License
 
-	if !bytes.Equal(authorityKeyId, license.AuthorityKeyID) {
-		return errors.New("invalid Authority Id")
-	}
-	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm)
+	hashFunc, err := auhtorityhashFromAlgorithm(publicKey, license)
 	if err != nil {
 		return err
 	}
