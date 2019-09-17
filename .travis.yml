@@ -6,9 +6,21 @@ go:
   - 1.11.x
   - 1.12.x
 
+env:
+  global:
+    - CC_TEST_REPORTER_ID=c1a793d2dc57edd278ebd25026c68b59eb78b21c6ad6ae71a46ee53d9460e894
+
+before_script:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter; fi
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+  - make install-tools
+
+
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  - ./cc-test-reporter after-build
 
