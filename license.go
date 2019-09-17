@@ -3,15 +3,9 @@ package license
 import (
 	"bytes"
 	"crypto"
-	"crypto/rand"
 	"encoding/asn1"
 	"errors"
 	"time"
-)
-
-var (
-	oidLicenseMinVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 1}
-	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
 )
 
 // License godoc
@@ -55,8 +49,10 @@ type asnSignedLicense struct {
 	Customer           asnCustomer  `asn1:"optional,private,omitempty"`
 	ValidFrom          int64        `asn1:"optional,default:0"`
 	ValidUntil         int64        `asn1:"optional,default:0"`
+	MinVersion         int64        `asn1:"optional,default:0"`
+	MaxVersion         int64        `asn1:"optional,default:0"`
 	Features           []asnFeature `asn1:"optional,omitempty"`
-	AuthorityKeyId     []byte
+	AuthorityKeyID     []byte
 	SignatureAlgorithm asn1.ObjectIdentifier
 }
 
@@ -103,12 +99,6 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	}
 	var features []asnFeature
 
-	if template.MinVersion > 0 {
-		features = append(features, asnFeature{Oid: oidLicenseMinVersion, Limit: template.MinVersion})
-	}
-	if template.MaxVersion > 0 {
-		features = append(features, asnFeature{Oid: oidLicenseMaxVersion, Limit: template.MaxVersion})
-	}
 	for _, feature := range template.Features {
 		features = append(features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
@@ -125,20 +115,18 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		},
 		ValidFrom:          template.ValidFrom.Unix(),
 		ValidUntil:         template.ValidUntil.Unix(),
+		MinVersion:         template.MinVersion,
+		MaxVersion:         template.MaxVersion,
 		Features:           features,
-		AuthorityKeyId:     authorityKeyId,
+		AuthorityKeyID:     authorityKeyId,
 		SignatureAlgorithm: signatureAlgorithm,
 	}
 
-	digest, err := asnObjectSignature(tbsLicense, hashFunc.New())
+	signature, err := signAsnObject(tbsLicense, key, hashFunc)
 	if err != nil {
 		return nil, err
 	}
-	var signature []byte
-	signature, err = key.Sign(rand.Reader, digest, hashFunc)
-	if err != nil {
-		return nil, err
-	}
+
 	licObject := &asnLicense{
 		License: tbsLicense,
 		Signature: asnSignature{
@@ -165,8 +153,8 @@ func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	}
 	license := licObject.License
 
-	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
-		return errors.New("invalid AuthorityId")
+	if !bytes.Equal(authorityKeyId, license.AuthorityKeyID) {
+		return errors.New("invalid Authority Id")
 	}
 	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm)
 	if err != nil {
@@ -220,6 +208,8 @@ func (l *License) setSoftwareInfo(template asnSignedLicense) error {
 	if template.ValidUntil > 0 {
 		l.ValidUntil = time.Unix(template.ValidUntil, 0)
 	}
+	l.MinVersion = template.MinVersion
+	l.MaxVersion = template.MaxVersion
 	return nil
 }
 
@@ -236,18 +226,11 @@ func (l *License) setFeaturesInfo(features []asnFeature) error {
 	// Clear old features
 	l.Features = []Feature{}
 	for _, feature := range features {
-		switch {
-		case feature.Oid.Equal(oidLicenseMinVersion):
-			l.MinVersion = feature.Limit
-		case feature.Oid.Equal(oidLicenseMaxVersion):
-			l.MaxVersion = feature.Limit
-		default:
-			description, found := l.knownFeatures[feature.Oid.String()]
-			if !found {
-				continue
-			}
-			l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
+		description, found := l.knownFeatures[feature.Oid.String()]
+		if !found {
+			continue
 		}
+		l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
 	}
 	return nil
 }

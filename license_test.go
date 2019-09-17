@@ -86,6 +86,11 @@ const (
 	//testLicense2pem = "MIIBQTCB5hMMVGVzdCBQcm9kdWN0Ex0wNTcxNy00M0Q4Ni04MUMwOC1ENjEzMC1GMDkwQzA5Ew1UZXN0IEN1c3RvbWVyEwJVUxMITmV3IFlvcmsTCFRFU1QgTExDExBTYWxlcyBEZXBhcnRtZW50MCYXETE5MDEwMTAyMDAwMCswMjAwFxExOTEyMzAwMjAwMDArMDIwMDAyMAsGBisGAQMBAQIBZDAMBgYrBgEDAQICAgPoMAsGBisGAQMCAQIBATAIBgYrBgEDAgIEFGRbr5QxHqvKklBbS9jTZ5GYoyGuMAoGCCqGSM49BAMCMFYwCgYIKoZIzj0EAwIDSAAwRQIhAM3veaQ7Tut6RTKtvFRkw4Tdw2JjBhVA0oHe3WLZgO0+AiAcGxXdRqsrDYTzU4T7iQbiciKMGpaHPvyIYhndlBkY0A=="
 )
 
+var (
+	oidLicenseMinVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 1}
+	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
+)
+
 func TestCreateLicense(t *testing.T) {
 
 	signKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

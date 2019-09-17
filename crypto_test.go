@@ -83,14 +83,6 @@ func Test_hashFuncFromAlgorithm(t *testing.T) {
 			Oid:        oidSignatureSHA1WithRSA,
 			ShouldFail: false,
 		},
-		{
-			Oid:        oidLicenseMinVersion,
-			ShouldFail: true,
-		},
-		{
-			Oid:        oidLicenseMaxVersion,
-			ShouldFail: true,
-		},
 	}
 
 	for _, test := range tests {

@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
@@ -136,4 +137,17 @@ func asnObjectSignature(data interface{}, hash hash.Hash) ([]byte, error) {
 		return nil, err
 	}
 	return hash.Sum(nil), err
+}
+
+func signAsnObject(data interface{}, key crypto.Signer, hash crypto.Hash) ([]byte, error) {
+	asnData, err := asn1.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	digest := hash.New()
+	_, err = digest.Write(asnData)
+	if err != nil {
+		return nil, err
+	}
+	return key.Sign(rand.Reader, digest.Sum(nil), hash)
 }

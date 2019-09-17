@@ -3,6 +3,7 @@ package license
 import (
 	"encoding/asn1"
 	"errors"
+	"fmt"
 )
 
 // RegisterFeature - register a feature into license registry so it will be recognized at Load time
@@ -13,7 +14,7 @@ func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error 
 	index := oid.String()
 	known, found := l.knownFeatures[index]
 	if found {
-		return errors.New("Feature `" + name + "` already registered as `" + known + "` with ObjectIdentifier " + index)
+		return fmt.Errorf("Feature `%s` already registered as `%s` with ObjectIdentifier %s", name, known, index)
 	}
 	l.knownFeatures[oid.String()] = name
 	return nil
