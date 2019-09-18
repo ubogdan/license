@@ -15,7 +15,7 @@ before_script:
 
 
 script:
-  - go test -coverprofile=coverage.txt -covermode=atomic
+  - go test -coverprofile=c.out -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)

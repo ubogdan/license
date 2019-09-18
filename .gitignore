@@ -12,4 +12,6 @@
 *.out
 
 # GO Coverage
+c.out
 coverage.txt
+cc-test-reporter
