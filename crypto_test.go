@@ -78,7 +78,7 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 
 func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 1024)
-	authorityId, err := authorityHashFromKey(key.Public())
+	authorityID, err := authorityHashFromKey(key.Public())
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -88,14 +88,14 @@ func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 	}{
 		{
 			License: asnSignedLicense{ // invalid Key for selected algorithm
-				AuthorityKeyID:     authorityId,
+				AuthorityKeyID:     authorityID,
 				SignatureAlgorithm: oidSignatureECDSAWithSHA1,
 			},
 			ShouldFail: true,
 		},
 		{
 			License: asnSignedLicense{
-				AuthorityKeyID:     authorityId,
+				AuthorityKeyID:     authorityID,
 				SignatureAlgorithm: oidSignatureSHA1WithRSA,
 			},
 			Hash:       crypto.SHA1,
@@ -103,7 +103,7 @@ func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 		},
 		{
 			License: asnSignedLicense{ // invalid/unknown algorithm
-				AuthorityKeyID:     authorityId,
+				AuthorityKeyID:     authorityID,
 				SignatureAlgorithm: asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 100},
 			},
 			ShouldFail: true,
