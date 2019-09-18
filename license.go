@@ -87,12 +87,10 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
-
-	authorityKeyId, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
+	authorityKeyID, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
 	if err != nil {
 		return nil, err
 	}
-
 	tbsLicense := asnSignedLicense{
 		ProductName:  template.ProductName,
 		SerialNumber: template.SerialNumber,
@@ -107,19 +105,17 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		ValidUntil:         template.ValidUntil.Unix(),
 		MinVersion:         template.MinVersion,
 		MaxVersion:         template.MaxVersion,
-		AuthorityKeyID:     authorityKeyId,
+		AuthorityKeyID:     authorityKeyID,
 		SignatureAlgorithm: signatureAlgorithm,
 	}
 
 	for _, feature := range template.Features {
 		tbsLicense.Features = append(tbsLicense.Features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
-
 	signature, err := signAsnObject(tbsLicense, key, hashFunc)
 	if err != nil {
 		return nil, err
 	}
-
 	licObject := &asnLicense{
 		License: tbsLicense,
 		Signature: asnSignature{
@@ -131,29 +127,24 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	return asn1.Marshal(*licObject)
 }
 
-// Load a license.
+// Load Load license from asn encoded file.
 func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
 	var licObject asnLicense
 	rest, err := asn1.Unmarshal(asn1Data, &licObject)
 	if err != nil || len(rest) != 0 {
 		return errors.New("license: mallformed data")
 	}
-
-	license := licObject.License
-
-	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, license)
+	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, licObject.License)
 	if err != nil {
 		return err
 	}
-
 	err = checkSignature(digest, licObject.Signature.Value.Bytes, hashFunc, publicKey)
 	if err != nil {
 		return err
 	}
-
 	l.signature = licObject.Signature
 
-	return l.setSoftwareInfo(license)
+	return l.setSoftwareInfo(licObject.License)
 }
 
 func (l *License) setSoftwareInfo(template asnSignedLicense) error {

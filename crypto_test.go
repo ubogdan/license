@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,36 +17,42 @@ import (
 	"github.com/ubogdan/mock"
 )
 
-func Test_hashFromPublicKey(t *testing.T) {
+func Test_auhtorityhashFromPublicKey(t *testing.T) {
 
 	rsa1024Key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	ell256Key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	ell384Key, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	ell521Key, _ := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-
+	ed25519Key, _, _ := ed25519.GenerateKey(rand.Reader)
 	tests := []struct {
 		Key        crypto.Signer
+		Hash       crypto.Hash
 		ShouldFail bool
 	}{
 		{
 			Key:        rsa1024Key,
+			Hash:       crypto.SHA256,
 			ShouldFail: false,
 		},
 		{
 			Key:        ell256Key,
+			Hash:       crypto.SHA256,
 			ShouldFail: false,
 		},
 		{
 			Key:        ell384Key,
+			Hash:       crypto.SHA384,
 			ShouldFail: false,
 		},
 		{
 			Key:        ell521Key,
+			Hash:       crypto.SHA512,
 			ShouldFail: false,
 		},
+
 		{
 			Key: &mock.CryptoSigner{
-				PublicKey: &ecdsa.PublicKey{},
+				PublicKey: ed25519Key,
 			},
 			ShouldFail: true,
 		},
@@ -59,41 +66,60 @@ func Test_hashFromPublicKey(t *testing.T) {
 
 	for _, test := range tests {
 		pubkey := test.Key.Public()
-		_, _, _, err := auhtorityhashFromPublicKey(pubkey)
+		_, hash, _, err := auhtorityhashFromPublicKey(pubkey)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
+			assert.Equal(t, hash, test.Hash)
 		}
 	}
 }
 
-/*
-func Test_hashFuncFromAlgorithm(t *testing.T) {
+func Test_auhtorityhashFromAlgorithm(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	authorityId, err := authorityHashFromKey(key.Public())
+	assert.NoError(t, err)
+
 	tests := []struct {
-		Oid        asn1.ObjectIdentifier
+		License    asnSignedLicense
+		Hash       crypto.Hash
 		ShouldFail bool
 	}{
 		{
-			Oid:        oidSignatureECDSAWithSHA1,
+			License: asnSignedLicense{ // invalid Key for selected algorithm
+				AuthorityKeyID:     authorityId,
+				SignatureAlgorithm: oidSignatureECDSAWithSHA1,
+			},
+			ShouldFail: true,
+		},
+		{
+			License: asnSignedLicense{
+				AuthorityKeyID:     authorityId,
+				SignatureAlgorithm: oidSignatureSHA1WithRSA,
+			},
+			Hash:       crypto.SHA1,
 			ShouldFail: false,
 		},
 		{
-			Oid:        oidSignatureSHA1WithRSA,
-			ShouldFail: false,
+			License: asnSignedLicense{ // invalid/unknown algorithm
+				AuthorityKeyID:     authorityId,
+				SignatureAlgorithm: asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 100},
+			},
+			ShouldFail: true,
 		},
 	}
 
 	for _, test := range tests {
-		_, err := auhtorityhashFromAlgorithm(nil,test.Oid)
+		_, hash, err := auhtorityhashFromAlgorithm(key.Public(), test.License)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
+			assert.Equal(t, hash, test.Hash)
 		}
 	}
 }
-*/
 
 type mocHash struct{}
 

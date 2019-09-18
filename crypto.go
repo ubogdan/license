@@ -49,25 +49,31 @@ func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash
 	if err != nil {
 		return nil, hashFunc, err
 	}
-
 	if !bytes.Equal(digest, license.AuthorityKeyID) {
 		return nil, hashFunc, errors.New("invalid Authority Id")
 	}
-
+	var pubKeyAlgo x509.PublicKeyAlgorithm
+	switch key.(type) {
+	case *rsa.PublicKey:
+		pubKeyAlgo = x509.RSA
+	case *ecdsa.PublicKey:
+		pubKeyAlgo = x509.ECDSA
+	}
 	for _, match := range signatureAlgorithmDetails {
-		if license.SignatureAlgorithm.Equal(match.oid) {
+		if license.SignatureAlgorithm.Equal(match.oid) && match.pubKeyAlgo == pubKeyAlgo {
 			return asnLicenseHash(license, match.hash)
 		}
 	}
-
 	return nil, hashFunc, errors.New("algorithm unimplemented")
 }
 
 func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
-
 	var signatureAlgorithm asn1.ObjectIdentifier
 	var hashFunc crypto.Hash
-
+	digest, err := authorityHashFromKey(key)
+	if err != nil {
+		return nil, hashFunc, signatureAlgorithm, err
+	}
 	switch pub := key.(type) {
 	case *rsa.PublicKey:
 		hashFunc = crypto.SHA256
@@ -83,17 +89,9 @@ func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.Obje
 		case elliptic.P521():
 			hashFunc = crypto.SHA512
 			signatureAlgorithm = oidSignatureECDSAWithSHA512
-		default:
-			return nil, hashFunc, signatureAlgorithm, errors.New("unknown elliptic curve")
 		}
-
 	default:
 		return nil, hashFunc, signatureAlgorithm, errors.New("only RSA and ECDSA keys supported")
-	}
-
-	digest, err := authorityHashFromKey(key)
-	if err != nil {
-		return nil, hashFunc, signatureAlgorithm, err
 	}
 
 	return digest, hashFunc, signatureAlgorithm, nil
@@ -128,7 +126,7 @@ func ecdsaVerifyPCKS(pub *ecdsa.PublicKey, digest, signature []byte) error {
 }
 
 func authorityHashFromKey(key interface{}) ([]byte, error) {
-	sigBytes, err := x509.MarshalPKIXPublicKey(key)
+	sigBytes, err := x509.MarshalPKIXPublicKey(key) // *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +151,6 @@ func asnLicenseHash(license asnSignedLicense, h crypto.Hash) (hash []byte, hashF
 	if err != nil {
 		return nil, h, err
 	}
-
 	digest := h.New()
 	_, err = digest.Write(asnData)
 	if err != nil {
