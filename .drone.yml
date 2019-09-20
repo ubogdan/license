@@ -5,9 +5,9 @@ platform:
   os: linux
   arch: amd64
 
-workspace:
-  base: /go
-  path: src/code.gitea.io/gitea
+#workspace:
+#  base: /go
+# path: src/code.gitea.io/gitea
   
 steps:
   - name: build
