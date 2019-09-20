@@ -16,6 +16,7 @@ steps:
     commands:
       - go test
 
+---
 kind: pipeline
 name: build
 
