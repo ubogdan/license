@@ -1,7 +1,4 @@
 kind: pipeline
-  build:
-    image: debian:latest
-
 name: default
 
 platform:
