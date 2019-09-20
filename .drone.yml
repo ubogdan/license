@@ -1,5 +1,5 @@
 kind: pipeline
-name: testing
+name: test
 
 platform:
   os: linux
@@ -16,3 +16,9 @@ steps:
     commands:
       - go test
 
+kind: pipeline
+name: build
+
+platform:
+  os: linux
+  arch: amd64
