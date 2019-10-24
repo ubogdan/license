@@ -81,6 +81,7 @@ func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 	authorityID, err := authorityHashFromKey(key.Public())
 	assert.NoError(t, err)
 
+func Test_hashFuncFromAlgorithm(t *testing.T) {
 	tests := []struct {
 		License    asnSignedLicense
 		Hash       crypto.Hash
