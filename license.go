@@ -14,8 +14,8 @@ type License struct {
 	Customer     Customer  `json:"customer"`
 	ValidFrom    time.Time `json:"valid_from,omitempty"`
 	ValidUntil   time.Time `json:"valid_until,omitempty"`
-	MinVersion   int64     `json:"min_version,omitempty"`
-	MaxVersion   int64     `json:"max_version,omitempty"`
+	MinVersion   Version   `json:"min_version,omitempty"`
+	MaxVersion   Version   `json:"max_version,omitempty"`
 	Features     []Feature `json:"features"`
 }
 
@@ -93,8 +93,8 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		},
 		ValidFrom:          template.ValidFrom.Unix(),
 		ValidUntil:         template.ValidUntil.Unix(),
-		MinVersion:         template.MinVersion,
-		MaxVersion:         template.MaxVersion,
+		MinVersion:         int64(template.MinVersion),
+		MaxVersion:         int64(template.MaxVersion),
 		AuthorityKeyID:     authorityKeyID,
 		SignatureAlgorithm: signatureAlgorithm,
 	}
@@ -148,8 +148,8 @@ func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, e
 		SerialNumber: tmpl.SerialNumber,
 		ValidFrom:    time.Time{},
 		ValidUntil:   time.Time{},
-		MinVersion:   tmpl.MinVersion,
-		MaxVersion:   tmpl.MaxVersion,
+		MinVersion:   Version(tmpl.MinVersion),
+		MaxVersion:   Version(tmpl.MaxVersion),
 		Customer: Customer{
 			Name:               tmpl.Customer.Name,
 			Country:            tmpl.Customer.Country,

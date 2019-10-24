@@ -231,8 +231,8 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 	license, err := Load(testLicense, privateEcc.Public(), nil)
 	assert.NoError(t, err)
 
-	assert.Equalf(t, int64(testLicenseMinVersion), license.MinVersion, "Invalid min version")
-	assert.Equalf(t, int64(testLicenseMaxVersion), license.MaxVersion, "Invalid max version")
+	assert.Equalf(t, Version(testLicenseMinVersion), license.MinVersion, "Invalid min version")
+	assert.Equalf(t, Version(testLicenseMaxVersion), license.MaxVersion, "Invalid max version")
 
 }
 
