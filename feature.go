@@ -2,30 +2,12 @@ package license
 
 import (
 	"encoding/asn1"
-	"errors"
-	"fmt"
 )
 
-// RegisterFeature - register a feature into license registry so it will be recognized at Load time
-func (l *License) RegisterFeature(name string, oid asn1.ObjectIdentifier) error {
-	if l.knownFeatures == nil {
-		l.knownFeatures = make(map[string]string)
-	}
-	index := oid.String()
-	known, found := l.knownFeatures[index]
-	if found {
-		return fmt.Errorf("Feature `%s` already registered as `%s` with ObjectIdentifier %s", name, known, index)
-	}
-	l.knownFeatures[oid.String()] = name
-	return nil
-}
-
-// GetFeature - return the feature name and limit
-func (l *License) GetFeature(oid asn1.ObjectIdentifier) (string, int64, int64, error) {
-	for _, feature := range l.Features {
-		if feature.Oid.Equal(oid) {
-			return l.knownFeatures[oid.String()], feature.Expire, feature.Limit, nil
-		}
-	}
-	return "", 0, 0, errors.New("invalid or missing feature")
+// Feature godoc
+type Feature struct {
+	Oid         asn1.ObjectIdentifier `json:"-"`
+	Description string                `json:"description"`
+	Expire      int64                 `json:"expire,omitempty"`
+	Limit       int64                 `json:"limit"`
 }

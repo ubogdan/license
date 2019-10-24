@@ -1,9 +1,7 @@
 package license
 
 import (
-	"bytes"
 	"crypto"
-	"crypto/rand"
 	"encoding/asn1"
 	"errors"
 	"time"
@@ -19,12 +17,10 @@ type License struct {
 	MinVersion   int64     `json:"min_version,omitempty"`
 	MaxVersion   int64     `json:"max_version,omitempty"`
 	Features     []Feature `json:"features"`
-
-	// Handle serial number validation during Load
-	SerialNumberValidator func(product, serial string) error
-	knownFeatures         map[string]string
-	signature             asnSignature
 }
+
+// SerialNumberValidator godoc
+type ValidateSN func(product, serial string, validFrom, validUntil, minVersion, maxVersion int64) error
 
 // Customer godoc
 type Customer struct {
@@ -33,14 +29,6 @@ type Customer struct {
 	City               string
 	Organization       string
 	OrganizationalUnit string
-}
-
-// Feature godoc
-type Feature struct {
-	Oid         asn1.ObjectIdentifier `json:"-"`
-	Description string                `json:"description"`
-	Expire      int64                 `json:"expire,omitempty"`
-	Limit       int64                 `json:"limit"`
 }
 
 type asnSignedLicense struct {
@@ -53,7 +41,7 @@ type asnSignedLicense struct {
 	MinVersion         int64        `asn1:"optional,default:0"`
 	MaxVersion         int64        `asn1:"optional,default:0"`
 	Features           []asnFeature `asn1:"optional,omitempty"`
-	AuthorityKeyId     []byte
+	AuthorityKeyID     []byte
 	SignatureAlgorithm asn1.ObjectIdentifier
 }
 
@@ -89,21 +77,10 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
-	publicKey := key.Public()
-	authorityKeyId, err := publicKeySignature(publicKey)
+	authorityKeyID, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
 	if err != nil {
 		return nil, err
 	}
-	hashFunc, signatureAlgorithm, err := hashFromPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-	var features []asnFeature
-
-	for _, feature := range template.Features {
-		features = append(features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
-	}
-
 	tbsLicense := asnSignedLicense{
 		ProductName:  template.ProductName,
 		SerialNumber: template.SerialNumber,
@@ -118,17 +95,14 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		ValidUntil:         template.ValidUntil.Unix(),
 		MinVersion:         template.MinVersion,
 		MaxVersion:         template.MaxVersion,
-		Features:           features,
-		AuthorityKeyId:     authorityKeyId,
+		AuthorityKeyID:     authorityKeyID,
 		SignatureAlgorithm: signatureAlgorithm,
 	}
 
-	digest, err := asnObjectSignature(tbsLicense, hashFunc.New())
-	if err != nil {
-		return nil, err
+	for _, feature := range template.Features {
+		tbsLicense.Features = append(tbsLicense.Features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
-	var signature []byte
-	signature, err = key.Sign(rand.Reader, digest, hashFunc)
+	signature, err := signAsnObject(tbsLicense, key, hashFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -143,99 +117,57 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	return asn1.Marshal(*licObject)
 }
 
-// Load a license.
-func (l *License) Load(asn1Data []byte, publicKey interface{}) error {
+// Load Load license from asn encoded file.
+func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*License, error) {
 	var licObject asnLicense
-	if rest, err := asn1.Unmarshal(asn1Data, &licObject); err != nil {
-		return err
-	} else if len(rest) != 0 {
-		return errors.New("license: trailing data")
+	rest, err := asn1.Unmarshal(asn1Data, &licObject)
+	if err != nil || len(rest) != 0 {
+		return nil, errors.New("license: mallformed data")
 	}
-
-	authorityKeyId, err := publicKeySignature(publicKey)
+	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, licObject.License)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	license := licObject.License
-
-	if !bytes.Equal(authorityKeyId, license.AuthorityKeyId) {
-		return errors.New("invalid AuthorityId")
-	}
-	hashFunc, err := hashFuncFromAlgorithm(license.SignatureAlgorithm)
-	if err != nil {
-		return err
-	}
-
-	digest, err := asnObjectSignature(license, hashFunc.New())
-	if err != nil {
-		return err
-	}
-
 	err = checkSignature(digest, licObject.Signature.Value.Bytes, hashFunc, publicKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = l.setSoftwareInfo(license)
-	if err != nil {
-		return err
-	}
-
-	err = l.setFeaturesInfo(license.Features)
-	if err != nil {
-		return err
-	}
-
-	err = l.setCustomerInfo(license.Customer)
-	if err != nil {
-		return err
-	}
-
-	l.signature = licObject.Signature
-
-	return nil
+	return setSoftwareInfo(licObject.License, validator)
 }
 
-func (l *License) setSoftwareInfo(template asnSignedLicense) error {
-	if l.SerialNumberValidator != nil {
-		err := l.SerialNumberValidator(template.ProductName, template.SerialNumber)
+func setSoftwareInfo(tmpl asnSignedLicense, validator ValidateSN) (*License, error) {
+	l := &License{}
+	if validator != nil {
+		err := validator(tmpl.ProductName, tmpl.SerialNumber, tmpl.ValidFrom, tmpl.ValidUntil, tmpl.MinVersion, tmpl.MaxVersion)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	l.ProductName = template.ProductName
-	l.SerialNumber = template.SerialNumber
+	l.ProductName = tmpl.ProductName
+	l.SerialNumber = tmpl.SerialNumber
 	l.ValidFrom = time.Time{}
-	if template.ValidFrom > 0 {
-		l.ValidFrom = time.Unix(template.ValidFrom, 0)
+	if tmpl.ValidFrom > 0 {
+		l.ValidFrom = time.Unix(tmpl.ValidFrom, 0)
 	}
 	l.ValidUntil = time.Time{}
-	if template.ValidUntil > 0 {
-		l.ValidUntil = time.Unix(template.ValidUntil, 0)
+	if tmpl.ValidUntil > 0 {
+		l.ValidUntil = time.Unix(tmpl.ValidUntil, 0)
 	}
-	l.MinVersion = template.MinVersion
-	l.MaxVersion = template.MaxVersion
-	return nil
-}
+	l.MinVersion = tmpl.MinVersion
+	l.MaxVersion = tmpl.MaxVersion
 
-func (l *License) setCustomerInfo(customer asnCustomer) error {
-	l.Customer.Name = customer.Name
-	l.Customer.Country = customer.Country
-	l.Customer.City = customer.City
-	l.Customer.Organization = customer.Organization
-	l.Customer.OrganizationalUnit = customer.OrganizationalUnit
-	return nil
-}
+	// Set customer info
+	l.Customer.Name = tmpl.Customer.Name
+	l.Customer.Country = tmpl.Customer.Country
+	l.Customer.City = tmpl.Customer.City
+	l.Customer.Organization = tmpl.Customer.Organization
+	l.Customer.OrganizationalUnit = tmpl.Customer.OrganizationalUnit
 
-func (l *License) setFeaturesInfo(features []asnFeature) error {
-	// Clear old features
+	// Set features info
 	l.Features = []Feature{}
-	for _, feature := range features {
-		description, found := l.knownFeatures[feature.Oid.String()]
-		if !found {
-			continue
-		}
-		l.Features = append(l.Features, Feature{Description: description, Oid: feature.Oid, Limit: feature.Limit})
+	for _, feature := range tmpl.Features {
+		l.Features = append(l.Features, Feature{Oid: feature.Oid, Limit: feature.Limit})
 	}
-	return nil
+	return l, nil
 }
