@@ -137,35 +137,35 @@ func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*Licens
 }
 
 func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, error) {
-	l := &License{}
 	if validator != nil {
 		err := validator(tmpl.ProductName, tmpl.SerialNumber, tmpl.ValidFrom, tmpl.ValidUntil, tmpl.MinVersion, tmpl.MaxVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
-	l.ProductName = tmpl.ProductName
-	l.SerialNumber = tmpl.SerialNumber
-	l.ValidFrom = time.Time{}
+	l := &License{
+		ProductName:  tmpl.ProductName,
+		SerialNumber: tmpl.SerialNumber,
+		ValidFrom:    time.Time{},
+		ValidUntil:   time.Time{},
+		MinVersion:   tmpl.MinVersion,
+		MaxVersion:   tmpl.MaxVersion,
+		Customer: Customer{
+			Name:               tmpl.Customer.Name,
+			Country:            tmpl.Customer.Country,
+			City:               tmpl.Customer.City,
+			Organization:       tmpl.Customer.Organization,
+			OrganizationalUnit: tmpl.Customer.OrganizationalUnit,
+		},
+		Features: []Feature{},
+	}
 	if tmpl.ValidFrom > 0 {
 		l.ValidFrom = time.Unix(tmpl.ValidFrom, 0)
 	}
-	l.ValidUntil = time.Time{}
 	if tmpl.ValidUntil > 0 {
 		l.ValidUntil = time.Unix(tmpl.ValidUntil, 0)
 	}
-	l.MinVersion = tmpl.MinVersion
-	l.MaxVersion = tmpl.MaxVersion
-
-	// Set customer info
-	l.Customer.Name = tmpl.Customer.Name
-	l.Customer.Country = tmpl.Customer.Country
-	l.Customer.City = tmpl.Customer.City
-	l.Customer.Organization = tmpl.Customer.Organization
-	l.Customer.OrganizationalUnit = tmpl.Customer.OrganizationalUnit
-
 	// Set features info
-	l.Features = []Feature{}
 	for _, feature := range tmpl.Features {
 		l.Features = append(l.Features, Feature{Oid: feature.Oid, Limit: feature.Limit})
 	}
