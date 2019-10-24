@@ -19,7 +19,7 @@ type License struct {
 	Features     []Feature `json:"features"`
 }
 
-// SerialNumberValidator godoc
+// ValidateSN godoc
 type ValidateSN func(product, serial string, validFrom, validUntil, minVersion, maxVersion int64) error
 
 // Customer godoc
@@ -133,10 +133,10 @@ func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*Licens
 		return nil, err
 	}
 
-	return setSoftwareInfo(licObject.License, validator)
+	return setLicenseDetails(licObject.License, validator)
 }
 
-func setSoftwareInfo(tmpl asnSignedLicense, validator ValidateSN) (*License, error) {
+func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, error) {
 	l := &License{}
 	if validator != nil {
 		err := validator(tmpl.ProductName, tmpl.SerialNumber, tmpl.ValidFrom, tmpl.ValidUntil, tmpl.MinVersion, tmpl.MaxVersion)
