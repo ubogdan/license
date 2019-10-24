@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Version lazy semver implementation
 type Version int64
 
 // String convert version integer to string
@@ -27,9 +28,8 @@ func NewVersion(v string) (Version, error) {
 	intVerSection := func(v string, n int) string {
 		if n < len(sections) {
 			return fmt.Sprintf("%04s", sections[n])
-		} else {
-			return "0000"
 		}
+		return "0000"
 	}
 	s := ""
 	for i := 0; i < 3; i++ {
