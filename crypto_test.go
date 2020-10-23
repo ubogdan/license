@@ -10,12 +10,38 @@ import (
 	"crypto/rsa"
 	"encoding/asn1"
 	"errors"
+	"io"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/ubogdan/mock"
 )
+
+type CryptoSigner struct {
+	PublicKey crypto.PublicKey
+	SignFunc  func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
+}
+
+func (c CryptoSigner) Public() crypto.PublicKey {
+	return c.PublicKey
+}
+
+func (c CryptoSigner) Sign(rand io.Reader, data []byte, hash crypto.SignerOpts) ([]byte, error) {
+	return c.SignFunc(rand, data, hash)
+}
+
+type CryptoDecrypter struct {
+	PublicKey   crypto.PublicKey
+	DecryptFunc func(io.Reader, []byte, crypto.DecrypterOpts) ([]byte, error)
+}
+
+func (d CryptoDecrypter) Public() crypto.PublicKey {
+	return d.PublicKey
+}
+
+func (d CryptoDecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) ([]byte, error) {
+	return d.DecryptFunc(rand, msg, opts)
+}
 
 func Test_auhtorityhashFromPublicKey(t *testing.T) {
 
@@ -51,13 +77,13 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 		},
 
 		{
-			Key: &mock.CryptoSigner{
+			Key: &CryptoSigner{
 				PublicKey: ed25519Key,
 			},
 			ShouldFail: true,
 		},
 		{
-			Key: &mock.CryptoSigner{
+			Key: &CryptoSigner{
 				PublicKey: &dsa.PublicKey{},
 			},
 			ShouldFail: true,
@@ -199,7 +225,7 @@ func Test_checkSignature(t *testing.T) {
 			ShouldFail: true,
 		},
 		{
-			Key: mock.CryptoSigner{
+			Key: CryptoSigner{
 				PublicKey: &dsa.PublicKey{},
 			},
 			Signature:  []byte{},

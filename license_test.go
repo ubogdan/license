@@ -10,11 +10,12 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/ubogdan/mock"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/ubogdan/mock"
 )
 
 const (
