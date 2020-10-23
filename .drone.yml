@@ -5,21 +5,21 @@ platform:
   os: linux
   arch: amd64
 
-#workspace:
-#  base: /go
-# path: src/code.gitea.io/gitea
-  
 steps:
-  - name: build
+  - name: unit-test-1.13
     pull: always
     image: golang:1.13
     commands:
       - go test
 
----
-kind: pipeline
-name: build
+  - name: unit-test-1.14
+    pull: always
+    image: golang:1.14
+    commands:
+      - go test
 
-platform:
-  os: linux
-  arch: amd64
+  - name: unit-test-1.15
+    pull: always
+    image: golang:1.15
+    commands:
+      - go test
