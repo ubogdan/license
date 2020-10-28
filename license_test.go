@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/ubogdan/mock"
 )
 
 const (
@@ -38,6 +37,19 @@ var (
 	oidLicenseMaxVersion = asn1.ObjectIdentifier{1, 3, 6, 1, 3, 1, 2}
 )
 
+type CryptoSigner struct {
+	PublicKey crypto.PublicKey
+	SignFunc  func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
+}
+
+func (c CryptoSigner) Public() crypto.PublicKey {
+	return c.PublicKey
+}
+
+func (c CryptoSigner) Sign(rand io.Reader, data []byte, hash crypto.SignerOpts) ([]byte, error) {
+	return c.SignFunc(rand, data, hash)
+}
+
 func TestCreateLicense(t *testing.T) {
 
 	signKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -54,14 +66,14 @@ func TestCreateLicense(t *testing.T) {
 		},
 		{
 			Data: &License{},
-			Key: crypto.Signer(&mock.CryptoSigner{
+			Key: crypto.Signer(&CryptoSigner{
 				PublicKey: &dsa.PublicKey{},
 			}),
 			ShouldFail: true,
 		},
 		{
 			Data: &License{},
-			Key: &mock.CryptoSigner{
+			Key: &CryptoSigner{
 				PublicKey: signKey.PublicKey,
 				SignFunc: func(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 					return nil, errors.New("Fail")
@@ -317,7 +329,7 @@ func TestLoadLicenseInvalidKey(t *testing.T) {
 	}, privateEcc)
 	assert.NoError(t, err)
 
-	dsaKey := &mock.CryptoSigner{
+	dsaKey := &CryptoSigner{
 		PublicKey: &dsa.PublicKey{},
 	}
 

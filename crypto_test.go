@@ -17,19 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type CryptoSigner struct {
-	PublicKey crypto.PublicKey
-	SignFunc  func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
-}
-
-func (c CryptoSigner) Public() crypto.PublicKey {
-	return c.PublicKey
-}
-
-func (c CryptoSigner) Sign(rand io.Reader, data []byte, hash crypto.SignerOpts) ([]byte, error) {
-	return c.SignFunc(rand, data, hash)
-}
-
 type CryptoDecrypter struct {
 	PublicKey   crypto.PublicKey
 	DecryptFunc func(io.Reader, []byte, crypto.DecrypterOpts) ([]byte, error)

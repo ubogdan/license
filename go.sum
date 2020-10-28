@@ -5,5 +5,3 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
-github.com/ubogdan/mock v0.0.0-20190803183627-2da40ceb8817 h1:SYBhQvCyuwlkvOt1l5rB/mEeNK16dUtJWaL72jAFjgc=
-github.com/ubogdan/mock v0.0.0-20190803183627-2da40ceb8817/go.mod h1:8QxNZ9UIkKS8dp+h9ACxlrKIAi24uZk/1TlFaRhD4Ho=
