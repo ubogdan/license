@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// License godoc
+// License godoc.
 type License struct {
 	ProductName  string    `json:"product"`
 	SerialNumber string    `json:"serial"`
@@ -19,10 +19,10 @@ type License struct {
 	Features     []Feature `json:"features"`
 }
 
-// ValidateSN godoc
+// ValidateSN godoc.
 type ValidateSN func(product, serial string, validFrom, validUntil, minVersion, maxVersion int64) error
 
-// Customer godoc
+// Customer godoc.
 type Customer struct {
 	Name               string
 	Country            string
@@ -73,14 +73,15 @@ type asnLicense struct {
 
 // CreateLicense godoc.
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
-
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
+
 	authorityKeyID, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
 	if err != nil {
 		return nil, err
 	}
+
 	tbsLicense := asnSignedLicense{
 		ProductName:  template.ProductName,
 		SerialNumber: template.SerialNumber,
@@ -102,11 +103,13 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	for _, feature := range template.Features {
 		tbsLicense.Features = append(tbsLicense.Features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
+
 	signature, err := signAsnObject(tbsLicense, key, hashFunc)
 	if err != nil {
 		return nil, err
 	}
-	licObject := &asnLicense{
+
+	licObject := asnLicense{
 		License: tbsLicense,
 		Signature: asnSignature{
 			AlgorithmIdentifier: tbsLicense.SignatureAlgorithm,
@@ -114,20 +117,23 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		},
 	}
 
-	return asn1.Marshal(*licObject)
+	return asn1.Marshal(licObject)
 }
 
 // Load Load license from asn encoded file.
 func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*License, error) {
 	var licObject asnLicense
+
 	rest, err := asn1.Unmarshal(asn1Data, &licObject)
 	if err != nil || len(rest) != 0 {
 		return nil, errors.New("license: mallformed data")
 	}
+
 	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, licObject.License)
 	if err != nil {
 		return nil, err
 	}
+
 	err = checkSignature(digest, licObject.Signature.Value.Bytes, hashFunc, publicKey)
 	if err != nil {
 		return nil, err
@@ -143,7 +149,8 @@ func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, e
 			return nil, err
 		}
 	}
-	l := &License{
+
+	l := License{
 		ProductName:  tmpl.ProductName,
 		SerialNumber: tmpl.SerialNumber,
 		ValidFrom:    time.Time{},
@@ -159,15 +166,19 @@ func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, e
 		},
 		Features: []Feature{},
 	}
+
 	if tmpl.ValidFrom > 0 {
 		l.ValidFrom = time.Unix(tmpl.ValidFrom, 0)
 	}
+
 	if tmpl.ValidUntil > 0 {
 		l.ValidUntil = time.Unix(tmpl.ValidUntil, 0)
 	}
+
 	// Set features info
 	for _, feature := range tmpl.Features {
 		l.Features = append(l.Features, Feature{Oid: feature.Oid, Limit: feature.Limit})
 	}
-	return l, nil
+
+	return &l, nil
 }

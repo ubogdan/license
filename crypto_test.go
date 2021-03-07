@@ -31,7 +31,6 @@ func (d CryptoDecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.Decrypt
 }
 
 func Test_auhtorityhashFromPublicKey(t *testing.T) {
-
 	rsa1024Key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	ell256Key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	ell384Key, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
@@ -228,5 +227,4 @@ func Test_checkSignature(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
-
 }

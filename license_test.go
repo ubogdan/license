@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	testEccPrivate                        = "MHcCAQEEIMVSIK6PTSva0pJifUoFWU5vNUtsZRAL76nxIA2GT/CroAoGCCqGSM49AwEHoUQDQgAEPG9ZZcLgHiAWGLKScyJnnEzX6gCqTVIc1CQTf77LgxHTc1mkDKh8xJ7VQUh+6od0h9ce5xrHcnJ0VB3rvBVWMQ=="
+	testEccPrivate = "MHcCAQEEIMVSIK6PTSva0pJifUoFWU5vNUtsZRAL76nxIA2GT/CroAoGCCqGSM49AwEHoUQ" +
+		"DQgAEPG9ZZcLgHiAWGLKScyJnnEzX6gCqTVIc1CQTf77LgxHTc1mkDKh8xJ7VQUh+6od0h9ce5xrHcnJ0VB3rvBVWMQ=="
 	testLicenseProduct                    = "Test Product"
 	testLicenseSerial                     = "05717-43D86-81C08-D6130-F090C"
 	testLicenseMinVersion                 = 100        // 0.10.0
@@ -51,7 +52,6 @@ func (c CryptoSigner) Sign(rand io.Reader, data []byte, hash crypto.SignerOpts) 
 }
 
 func TestCreateLicense(t *testing.T) {
-
 	signKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	tests := []struct {
@@ -162,11 +162,9 @@ func TestLoadLicenseWithCustomer(t *testing.T) {
 	assert.Equalf(t, encoded.Customer.Country, decoder.Customer.Country, "Invalid customer Country")
 	assert.Equalf(t, encoded.Customer.Organization, decoder.Customer.Organization, "Invalid customer Organization")
 	assert.Equalf(t, encoded.Customer.OrganizationalUnit, decoder.Customer.OrganizationalUnit, "Invalid customer OrganizationalUnit")
-
 }
 
 func TestLoadLicenseWithWrongAuthority(t *testing.T) {
-
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
 
@@ -189,7 +187,6 @@ func TestLoadLicenseWithWrongAuthority(t *testing.T) {
 }
 
 func TestLoadLicenseWithExpire(t *testing.T) {
-
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
 
@@ -222,11 +219,9 @@ func TestLoadLicenseWithExpire(t *testing.T) {
 
 	assert.Equalf(t, encoded.ValidFrom, decoded.ValidFrom, "Invalid min version")
 	assert.Equalf(t, encoded.ValidUntil, decoded.ValidUntil, "Invalid max version")
-
 }
 
 func TestLoadLicenseWithVersion(t *testing.T) {
-
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
 
@@ -246,7 +241,6 @@ func TestLoadLicenseWithVersion(t *testing.T) {
 
 	assert.Equalf(t, Version(testLicenseMinVersion), license.MinVersion, "Invalid min version")
 	assert.Equalf(t, Version(testLicenseMaxVersion), license.MaxVersion, "Invalid max version")
-
 }
 
 func TestLoadLicenseWithSerial(t *testing.T) {
@@ -312,11 +306,9 @@ func TestLoadLicenseCorrupt(t *testing.T) {
 
 	_, err = Load(prependLicense, privateEcc.Public(), nil)
 	assert.Error(t, err)
-
 }
 
 func TestLoadLicenseInvalidKey(t *testing.T) {
-
 	derBytes, err := base64.StdEncoding.DecodeString(testEccPrivate)
 	assert.NoError(t, err)
 
@@ -336,7 +328,6 @@ func TestLoadLicenseInvalidKey(t *testing.T) {
 	// Parse
 	_, err = Load(testLicense, dsaKey, nil)
 	assert.Error(t, err)
-
 }
 
 func TestLoadLicenseInvalidAlorithm(t *testing.T) {
@@ -361,5 +352,4 @@ func TestLoadLicenseInvalidAlorithm(t *testing.T) {
 	// Parse
 	_, err = Load(testLicense, privateEcc, nil)
 	assert.Error(t, err)
-
 }

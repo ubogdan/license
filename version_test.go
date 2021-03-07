@@ -7,7 +7,6 @@ import (
 )
 
 func TestVersion_String(t *testing.T) {
-
 	tests := []struct {
 		version Version
 		expect  string
@@ -30,6 +29,7 @@ func TestVersion_String(t *testing.T) {
 		assert.Equal(t, test.version.String(), test.expect)
 	}
 }
+
 func TestNewVersion(t *testing.T) {
 	tests := []struct {
 		version    string
@@ -64,6 +64,5 @@ func TestNewVersion(t *testing.T) {
 		} else {
 			assert.Equal(t, val, test.expect)
 		}
-
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/asn1"
 )
 
-// Feature godoc
+// Feature godoc.
 type Feature struct {
 	Oid         asn1.ObjectIdentifier `json:"-"`
 	Description string                `json:"description"`

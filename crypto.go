@@ -42,38 +42,44 @@ var signatureAlgorithmDetails = []struct {
 	{x509.ECDSAWithSHA512, "ECDSA-SHA512", oidSignatureECDSAWithSHA512, x509.ECDSA, crypto.SHA512},
 }
 
-// Identify Signature Algorithm by oid
+// Identify Signature Algorithm by oid.
 func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash []byte, hashFunc crypto.Hash, err error) {
-
 	digest, err := authorityHashFromKey(key)
 	if err != nil {
 		return nil, hashFunc, err
 	}
+
 	if !bytes.Equal(digest, license.AuthorityKeyID) {
 		return nil, hashFunc, errors.New("invalid Authority Id")
 	}
+
 	var pubKeyAlgo x509.PublicKeyAlgorithm
+
 	switch key.(type) {
 	case *rsa.PublicKey:
 		pubKeyAlgo = x509.RSA
 	case *ecdsa.PublicKey:
 		pubKeyAlgo = x509.ECDSA
 	}
+
 	for _, match := range signatureAlgorithmDetails {
 		if license.SignatureAlgorithm.Equal(match.oid) && match.pubKeyAlgo == pubKeyAlgo {
 			return asnLicenseHash(license, match.hash)
 		}
 	}
+
 	return nil, hashFunc, errors.New("algorithm unimplemented")
 }
 
 func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
 	var signatureAlgorithm asn1.ObjectIdentifier
 	var hashFunc crypto.Hash
+
 	digest, err := authorityHashFromKey(key)
 	if err != nil {
 		return nil, hashFunc, signatureAlgorithm, err
 	}
+
 	switch pub := key.(type) {
 	case *rsa.PublicKey:
 		hashFunc = crypto.SHA256
@@ -101,12 +107,14 @@ func checkSignature(digest, signature []byte, hashType crypto.Hash, publicKey cr
 	if !hashType.Available() {
 		return errors.New("cannot verify signature: algorithm unimplemented")
 	}
+
 	switch pub := publicKey.(type) {
 	case *rsa.PublicKey:
 		return rsa.VerifyPKCS1v15(pub, hashType, digest, signature)
 	case *ecdsa.PublicKey:
 		return ecdsaVerifyPCKS(pub, digest, signature)
 	}
+
 	return errors.New("cannot verify signature: only RSA and ECDSA keys supported")
 }
 
@@ -114,14 +122,18 @@ func ecdsaVerifyPCKS(pub *ecdsa.PublicKey, digest, signature []byte) error {
 	type ecdsaSignature struct {
 		R, S *big.Int
 	}
+
 	ecdsaSig := new(ecdsaSignature)
+
 	rest, err := asn1.Unmarshal(signature, ecdsaSig)
 	if err != nil || len(rest) != 0 {
 		return errors.New("license: mallformed data")
 	}
+
 	if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 || !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
 		return errors.New("license: verification failure")
 	}
+
 	return nil
 }
 
@@ -130,11 +142,14 @@ func authorityHashFromKey(key interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	digest := sha1.New()
+
 	_, err = digest.Write(sigBytes)
 	if err != nil {
 		return nil, err
 	}
+
 	return digest.Sum(nil), nil
 }
 
@@ -143,6 +158,7 @@ func signAsnObject(license asnSignedLicense, key crypto.Signer, hash crypto.Hash
 	if err != nil {
 		return nil, err
 	}
+
 	return key.Sign(rand.Reader, digest, hash)
 }
 
@@ -151,10 +167,13 @@ func asnLicenseHash(license asnSignedLicense, h crypto.Hash) (hash []byte, hashF
 	if err != nil {
 		return nil, h, err
 	}
+
 	digest := h.New()
+
 	_, err = digest.Write(asnData)
 	if err != nil {
 		return nil, h, err
 	}
+
 	return digest.Sum(nil), h, nil
 }
