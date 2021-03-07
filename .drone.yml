@@ -1,19 +1,4 @@
 kind: pipeline
-name: go1.13-test
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-  - name: go-1.13-test
-    pull: always
-    image: golang:1.13
-    commands:
-      - go test
-
----
-kind: pipeline
 name: go1.14-test
 
 platform:
@@ -39,5 +24,20 @@ steps:
   - name: go-1.15-test
     pull: always
     image: golang:1.15
+    commands:
+      - go test
+
+---
+kind: pipeline
+name: go1.16-test
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: go-1.16-test
+    pull: always
+    image: golang:1.16
     commands:
       - go test
