@@ -22,43 +22,18 @@ type License struct {
 // ValidateSN godoc.
 type ValidateSN func(product, serial string, validFrom, validUntil, minVersion, maxVersion int64) error
 
-// Customer godoc.
-type Customer struct {
-	Name               string
-	Country            string
-	City               string
-	Organization       string
-	OrganizationalUnit string
-}
-
 type asnSignedLicense struct {
 	Raw                asn1.RawContent
-	ProductName        string       `asn1:"optional,application,tag:0"`
-	SerialNumber       string       `asn1:"optional,application,tag:1"`
-	Customer           asnCustomer  `asn1:"optional,private,omitempty"`
-	ValidFrom          int64        `asn1:"optional,default:0"`
-	ValidUntil         int64        `asn1:"optional,default:0"`
-	MinVersion         int64        `asn1:"optional,default:0"`
-	MaxVersion         int64        `asn1:"optional,default:0"`
-	Features           []asnFeature `asn1:"optional,omitempty"`
+	ProductName        string    `asn1:"optional,application,tag:0"`
+	SerialNumber       string    `asn1:"optional,application,tag:1"`
+	Customer           Customer  `asn1:"optional,private,omitempty"`
+	ValidFrom          int64     `asn1:"optional,default:0"`
+	ValidUntil         int64     `asn1:"optional,default:0"`
+	MinVersion         int64     `asn1:"optional,default:0"`
+	MaxVersion         int64     `asn1:"optional,default:0"`
+	Features           []Feature `asn1:"optional,omitempty"`
 	AuthorityKeyID     []byte
 	SignatureAlgorithm asn1.ObjectIdentifier
-}
-
-type asnCustomer struct {
-	Raw                asn1.RawContent
-	Name               string `asn1:"optional,tag:0"`
-	Country            string `asn1:"optional,tag:1"`
-	City               string `asn1:"optional,tag:2"`
-	Organization       string `asn1:"optional,tag:3"`
-	OrganizationalUnit string `asn1:"optional,tag:4"`
-}
-
-type asnFeature struct {
-	Raw    asn1.RawContent
-	Oid    asn1.ObjectIdentifier
-	Expire int64 `asn1:"optional,tag:1"`
-	Limit  int64 `asn1:"optional,tag:2"`
 }
 
 type asnSignature struct {
@@ -70,6 +45,10 @@ type asnLicense struct {
 	License   asnSignedLicense
 	Signature asnSignature
 }
+
+const (
+	byteSize = 8
+)
 
 // CreateLicense godoc.
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
@@ -85,7 +64,7 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	tbsLicense := asnSignedLicense{
 		ProductName:  template.ProductName,
 		SerialNumber: template.SerialNumber,
-		Customer: asnCustomer{
+		Customer: Customer{
 			Name:               template.Customer.Name,
 			Country:            template.Customer.Country,
 			City:               template.Customer.City,
@@ -97,11 +76,8 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		MinVersion:         int64(template.MinVersion),
 		MaxVersion:         int64(template.MaxVersion),
 		AuthorityKeyID:     authorityKeyID,
+		Features:           template.Features,
 		SignatureAlgorithm: signatureAlgorithm,
-	}
-
-	for _, feature := range template.Features {
-		tbsLicense.Features = append(tbsLicense.Features, asnFeature{Oid: feature.Oid, Limit: feature.Limit})
 	}
 
 	signature, err := signAsnObject(tbsLicense, key, hashFunc)
@@ -113,7 +89,7 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 		License: tbsLicense,
 		Signature: asnSignature{
 			AlgorithmIdentifier: tbsLicense.SignatureAlgorithm,
-			Value:               asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
+			Value:               asn1.BitString{Bytes: signature, BitLength: len(signature) * byteSize},
 		},
 	}
 
@@ -126,7 +102,7 @@ func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*Licens
 
 	rest, err := asn1.Unmarshal(asn1Data, &licObject)
 	if err != nil || len(rest) != 0 {
-		return nil, errors.New("license: mallformed data")
+		return nil, errors.New("license: malformed data")
 	}
 
 	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, licObject.License)
@@ -142,41 +118,42 @@ func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*Licens
 	return setLicenseDetails(licObject.License, validator)
 }
 
-func setLicenseDetails(tmpl asnSignedLicense, validator ValidateSN) (*License, error) {
+func setLicenseDetails(license asnSignedLicense, validator ValidateSN) (*License, error) {
 	if validator != nil {
-		err := validator(tmpl.ProductName, tmpl.SerialNumber, tmpl.ValidFrom, tmpl.ValidUntil, tmpl.MinVersion, tmpl.MaxVersion)
+		err := validator(license.ProductName, license.SerialNumber,
+			license.ValidFrom, license.ValidUntil, license.MinVersion, license.MaxVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	l := License{
-		ProductName:  tmpl.ProductName,
-		SerialNumber: tmpl.SerialNumber,
+		ProductName:  license.ProductName,
+		SerialNumber: license.SerialNumber,
 		ValidFrom:    time.Time{},
 		ValidUntil:   time.Time{},
-		MinVersion:   Version(tmpl.MinVersion),
-		MaxVersion:   Version(tmpl.MaxVersion),
+		MinVersion:   Version(license.MinVersion),
+		MaxVersion:   Version(license.MaxVersion),
 		Customer: Customer{
-			Name:               tmpl.Customer.Name,
-			Country:            tmpl.Customer.Country,
-			City:               tmpl.Customer.City,
-			Organization:       tmpl.Customer.Organization,
-			OrganizationalUnit: tmpl.Customer.OrganizationalUnit,
+			Name:               license.Customer.Name,
+			Country:            license.Customer.Country,
+			City:               license.Customer.City,
+			Organization:       license.Customer.Organization,
+			OrganizationalUnit: license.Customer.OrganizationalUnit,
 		},
 		Features: []Feature{},
 	}
 
-	if tmpl.ValidFrom > 0 {
-		l.ValidFrom = time.Unix(tmpl.ValidFrom, 0)
+	if license.ValidFrom > 0 {
+		l.ValidFrom = time.Unix(license.ValidFrom, 0)
 	}
 
-	if tmpl.ValidUntil > 0 {
-		l.ValidUntil = time.Unix(tmpl.ValidUntil, 0)
+	if license.ValidUntil > 0 {
+		l.ValidUntil = time.Unix(license.ValidUntil, 0)
 	}
 
 	// Set features info
-	for _, feature := range tmpl.Features {
+	for _, feature := range license.Features {
 		l.Features = append(l.Features, Feature{Oid: feature.Oid, Limit: feature.Limit})
 	}
 

@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/asn1"
-	"errors"
 	"io"
 	"math/big"
 	"testing"
@@ -17,21 +16,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type CryptoDecrypter struct {
+type SingerVerifier struct {
 	PublicKey   crypto.PublicKey
+	SignFunc    func(io.Reader, []byte, crypto.SignerOpts) ([]byte, error)
 	DecryptFunc func(io.Reader, []byte, crypto.DecrypterOpts) ([]byte, error)
 }
 
-func (d CryptoDecrypter) Public() crypto.PublicKey {
-	return d.PublicKey
+func (sv SingerVerifier) Public() crypto.PublicKey {
+	return sv.PublicKey
 }
 
-func (d CryptoDecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) ([]byte, error) {
-	return d.DecryptFunc(rand, msg, opts)
+func (sv SingerVerifier) Sign(rand io.Reader, data []byte, hash crypto.SignerOpts) ([]byte, error) {
+	return sv.SignFunc(rand, data, hash)
+}
+
+func (sv SingerVerifier) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) ([]byte, error) {
+	return sv.DecryptFunc(rand, msg, opts)
 }
 
 func Test_auhtorityhashFromPublicKey(t *testing.T) {
-	rsa1024Key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	t.Parallel()
+
+	rsa1024Key, _ := rsa.GenerateKey(rand.Reader, 1024) //nolint:gosec
 	ell256Key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	ell384Key, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	ell521Key, _ := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
@@ -63,13 +69,13 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 		},
 
 		{
-			Key: &CryptoSigner{
+			Key: &SingerVerifier{
 				PublicKey: ed25519Key,
 			},
 			ShouldFail: true,
 		},
 		{
-			Key: &CryptoSigner{
+			Key: &SingerVerifier{
 				PublicKey: &dsa.PublicKey{},
 			},
 			ShouldFail: true,
@@ -89,7 +95,9 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 }
 
 func Test_auhtorityhashFromAlgorithm(t *testing.T) {
-	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	t.Parallel()
+
+	key, _ := rsa.GenerateKey(rand.Reader, 1024) //nolint:gosec
 	authorityID, err := authorityHashFromKey(key.Public())
 	assert.NoError(t, err)
 
@@ -133,15 +141,9 @@ func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 	}
 }
 
-type mocHash struct{}
-
-func (m mocHash) Write(p []byte) (n int, err error) { return 0, errors.New("Error") }
-func (m mocHash) Reset()                            { return }
-func (m mocHash) Size() int                         { return 0 }
-func (m mocHash) BlockSize() int                    { return 0 }
-func (m mocHash) Sum(b []byte) []byte               { return nil }
-
 func Test_checkSignature(t *testing.T) {
+	t.Parallel()
+
 	var err error
 
 	hashType := crypto.SHA1
@@ -150,7 +152,7 @@ func Test_checkSignature(t *testing.T) {
 	h.Write([]byte("Test Message"))
 	digest := h.Sum(nil)
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024) //nolint:gosec
 	assert.NoError(t, err)
 
 	eccKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -172,7 +174,11 @@ func Test_checkSignature(t *testing.T) {
 	invalidecdsaSignature, err := asn1.Marshal(ecdsaSignature{R: big.NewInt(0), S: big.NewInt(-1)})
 	assert.NoError(t, err)
 
-	invalidecdsaSignatureValues, err := asn1.Marshal(ecdsaSignature{R: big.NewInt(123123123123123), S: big.NewInt(543241234123)})
+	invalidecdsaSignatureValues, err := asn1.Marshal(ecdsaSignature{
+		R: big.NewInt(123123123123123),
+		S: big.NewInt(543241234123),
+	},
+	)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -211,7 +217,7 @@ func Test_checkSignature(t *testing.T) {
 			ShouldFail: true,
 		},
 		{
-			Key: CryptoSigner{
+			Key: SingerVerifier{
 				PublicKey: &dsa.PublicKey{},
 			},
 			Signature:  []byte{},

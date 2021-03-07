@@ -17,7 +17,7 @@ func (ver Version) String() string {
 	for i := 2; i >= 0; i-- {
 		rest := int64(tmp) % 10000
 		v[i] = strconv.FormatInt(rest, 10)
-		tmp = tmp / 10000
+		tmp /= 10000
 	}
 
 	return strings.Join(v, ".")
@@ -26,12 +26,12 @@ func (ver Version) String() string {
 // NewVersion semantic version to integer
 // valid format XXXX.XXXX.XXXX.
 func NewVersion(v string) (Version, error) {
-	sections := strings.Split(v, ".")
-
 	intVerSection := func(v string, n int) string {
+		sections := strings.Split(v, ".")
 		if n < len(sections) {
 			return fmt.Sprintf("%04s", sections[n])
 		}
+
 		return "0000"
 	}
 

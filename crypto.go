@@ -43,7 +43,9 @@ var signatureAlgorithmDetails = []struct {
 }
 
 // Identify Signature Algorithm by oid.
-func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash []byte, hashFunc crypto.Hash, err error) {
+func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) ([]byte, crypto.Hash, error) {
+	var hashFunc crypto.Hash
+
 	digest, err := authorityHashFromKey(key)
 	if err != nil {
 		return nil, hashFunc, err
@@ -72,8 +74,10 @@ func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) (hash
 }
 
 func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
-	var signatureAlgorithm asn1.ObjectIdentifier
-	var hashFunc crypto.Hash
+	var (
+		signatureAlgorithm asn1.ObjectIdentifier
+		hashFunc           crypto.Hash
+	)
 
 	digest, err := authorityHashFromKey(key)
 	if err != nil {
