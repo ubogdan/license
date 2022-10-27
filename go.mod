@@ -1,5 +1,5 @@
 module github.com/ubogdan/license
 
-go 1.13
+go 1.15
 
-require github.com/stretchr/testify v1.3.0
+require github.com/stretchr/testify v1.8.1
