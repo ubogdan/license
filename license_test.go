@@ -2,7 +2,6 @@ package license_test
 
 import (
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -66,7 +65,7 @@ func TestCreateLicense(t *testing.T) {
 		{
 			Data: &license.License{},
 			Key: crypto.Signer(&CryptoSigner{
-				PublicKey: &dsa.PublicKey{},
+				PublicKey: &struct{}{},
 			}),
 			ShouldFail: true,
 		},
@@ -339,7 +338,7 @@ func TestLoadLicenseInvalidKey(t *testing.T) {
 	assert.NoError(t, err)
 
 	dsaKey := &CryptoSigner{
-		PublicKey: &dsa.PublicKey{},
+		PublicKey: &struct{}{},
 	}
 
 	// Parse

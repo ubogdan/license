@@ -2,7 +2,6 @@ package license
 
 import (
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -76,7 +75,7 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 		},
 		{
 			Key: &SingerVerifier{
-				PublicKey: &dsa.PublicKey{},
+				PublicKey: &struct{}{},
 			},
 			ShouldFail: true,
 		},
@@ -218,7 +217,7 @@ func Test_checkSignature(t *testing.T) {
 		},
 		{
 			Key: SingerVerifier{
-				PublicKey: &dsa.PublicKey{},
+				PublicKey: &struct{}{},
 			},
 			Signature:  []byte{},
 			ShouldFail: true,
