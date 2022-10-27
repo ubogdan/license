@@ -84,7 +84,7 @@ func Test_auhtorityhashFromPublicKey(t *testing.T) {
 
 	for _, test := range tests {
 		pubkey := test.Key.Public()
-		_, hash, _, err := auhtorityhashFromPublicKey(pubkey)
+		_, hash, _, err := authorityHashFromPublicKey(pubkey)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {
@@ -131,7 +131,7 @@ func Test_auhtorityhashFromAlgorithm(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, hash, err := auhtorityhashFromAlgorithm(key.Public(), test.License)
+		_, hash, err := authorityHashFromAlgorithm(key.Public(), test.License)
 		if test.ShouldFail {
 			assert.Error(t, err)
 		} else {
