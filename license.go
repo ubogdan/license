@@ -50,13 +50,13 @@ const (
 	byteSize = 8
 )
 
-// CreateLicense godoc.
+// CreateLicense generate a license using a private key.
 func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	if key == nil {
 		return nil, errors.New("license: private key is nil")
 	}
 
-	authorityKeyID, hashFunc, signatureAlgorithm, err := auhtorityhashFromPublicKey(key.Public())
+	authorityKeyID, hashFunc, signatureAlgorithm, err := authorityHashFromPublicKey(key.Public())
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func CreateLicense(template *License, key crypto.Signer) ([]byte, error) {
 	return asn1.Marshal(licObject)
 }
 
-// Load Load license from asn encoded file.
+// Load a license from asn encoded byte data.
 func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*License, error) {
 	var licObject asnLicense
 
@@ -105,7 +105,7 @@ func Load(asn1Data []byte, publicKey interface{}, validator ValidateSN) (*Licens
 		return nil, errors.New("license: malformed data")
 	}
 
-	digest, hashFunc, err := auhtorityhashFromAlgorithm(publicKey, licObject.License)
+	digest, hashFunc, err := authorityHashFromAlgorithm(publicKey, licObject.License)
 	if err != nil {
 		return nil, err
 	}

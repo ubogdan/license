@@ -43,7 +43,7 @@ var signatureAlgorithmDetails = []struct {
 }
 
 // Identify Signature Algorithm by oid.
-func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) ([]byte, crypto.Hash, error) {
+func authorityHashFromAlgorithm(key interface{}, license asnSignedLicense) ([]byte, crypto.Hash, error) {
 	var hashFunc crypto.Hash
 
 	digest, err := authorityHashFromKey(key)
@@ -73,7 +73,7 @@ func auhtorityhashFromAlgorithm(key interface{}, license asnSignedLicense) ([]by
 	return nil, hashFunc, errors.New("algorithm unimplemented")
 }
 
-func auhtorityhashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
+func authorityHashFromPublicKey(key interface{}) ([]byte, crypto.Hash, asn1.ObjectIdentifier, error) {
 	var (
 		signatureAlgorithm asn1.ObjectIdentifier
 		hashFunc           crypto.Hash
@@ -131,7 +131,7 @@ func ecdsaVerifyPCKS(pub *ecdsa.PublicKey, digest, signature []byte) error {
 
 	rest, err := asn1.Unmarshal(signature, ecdsaSig)
 	if err != nil || len(rest) != 0 {
-		return errors.New("license: mallformed data")
+		return errors.New("license: malformed data")
 	}
 
 	if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 || !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
