@@ -1,0 +1,64 @@
+repo_name: ubogdan/license
+report_id: 6c58bcd0d2c3aaa034d138dfee299022
+repo_type: Public
+timestamp: '2023-11-09T21:00:15+00:00'
+requested_by: ubogdan
+provider: github
+branch: master
+detected_tools_count: 5
+tools:
+- name: Golang
+  description: An open source programming language that makes it easy to build simple,
+    reliable, and efficient software
+  website_url: http://golang.org/
+  license: BSD-3-Clause
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/1005/O6AczwfV_400x400.png
+  detection_source: Repo Metadata
+- name: Codecov
+  description: Hosted coverage reports with awesome features to enhance your CI workflow
+  website_url: https://codecov.io/
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Code Coverage
+  image_url: https://img.stackshare.io/service/2673/Codecov_Mark_Circle_Pink.png
+  detection_source: codecov.yml
+  last_updated_by: Bogdan U
+  last_updated_on: 2019-08-03 20:59:39.000000000 Z
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source: Repo Metadata
+- name: GitHub Actions
+  description: Automate your workflow from idea to production
+  website_url: https://github.com/features/actions
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Continuous Integration
+  image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source: ".github/workflows/unit-test.yml"
+  last_updated_by: Bogdan Ungureanu
+  last_updated_on: 2022-10-27 18:44:16.000000000 Z
+- name: Testify
+  description: A toolkit with common assertions and mocks that plays nicely with the
+    standard library
+  website_url: https://github.com/stretchr/testify
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Go Testing
+  image_url: https://img.stackshare.io/service/8695/stretchr.png
+  detection_source: go.mod
+  last_updated_by: Bogdan Ungureanu
+  last_updated_on: 2022-10-27 18:44:16.000000000 Z
