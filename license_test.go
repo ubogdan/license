@@ -15,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ubogdan/license"
+	"gopkg.ubogdan.com/license"
 )
 
 const (
