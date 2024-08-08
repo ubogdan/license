@@ -1,4 +1,4 @@
-module github.com/ubogdan/license
+module gopkg.ubogdan.com/license
 
 go 1.15
 
